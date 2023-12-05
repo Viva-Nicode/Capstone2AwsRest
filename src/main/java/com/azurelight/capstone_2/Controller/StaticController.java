@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequestMapping("/showMe")
-
 public class StaticController {
     @GetMapping("/gimoring")
 	public String moveSignupPage(Model model) {
