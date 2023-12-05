@@ -5,8 +5,8 @@ class ClassificationResult{
 
 }
 public class ClassificationService {
-    public static ClassificationResult doClassification(){
-        
+    public static ClassificationResult doClassification(final String Path){
+
         return null;
     }
 }
