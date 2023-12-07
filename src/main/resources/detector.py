@@ -3,7 +3,6 @@ try:
     import tensorflow as tf
     from PIL import Image
     from sys import argv
-    from json import dumps
 
     classification_model = tf.keras.models.load_model("/home/ubuntu/Capstone2AwsRest/src/main/resources/garbage_classifier")
     categoris = np.array(["battery", "cardboard", "clothes", "glass", "heating pad", "metal", "plastic", "shoes", "toothbrush"])
@@ -24,8 +23,8 @@ try:
         idx = np.array(pred).argmax()
         result = categoris[idx]
         score = pred[0][idx]
-        return {"name" : result, "score" : float(score)}
+        return f"name : {result}, score : {score}"
 
-    print(dumps(runDetector(argv[1])))
+    print("{" + runDetector(argv[1]) + "}")
 except Exception as e:
     print(e)

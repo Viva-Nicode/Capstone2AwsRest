@@ -36,16 +36,9 @@ public class ClassificationService {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
-        int len = result.length();
-        int targetIdx = 0;
-        for (int i = len - 1; i <= 0; i--) {
-            if (result.charAt(i) == '{') {
-                targetIdx = i;
-                break;
-            }
-        }
 
+        int targetIdx = result.lastIndexOf("{");
+	log.error("targetIdx : " + targetIdx);
         return result.substring(targetIdx);
     }
 }
