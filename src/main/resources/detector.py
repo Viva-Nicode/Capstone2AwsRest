@@ -23,8 +23,8 @@ try:
         idx = np.array(pred).argmax()
         result = categoris[idx]
         score = pred[0][idx]
-        return f"name : {result}, score : {score}"
+        return f"\"name\" : \"{result}\", \"score\" : {score}"
 
-    print("{" + runDetector(argv[1]) + "}")
+    print("{ " + runDetector(argv[1]) + " }")
 except Exception as e:
     print(e)

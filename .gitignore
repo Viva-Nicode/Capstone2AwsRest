@@ -27,3 +27,4 @@ out/
 *.png
 *.PNG 
 src/main/resources/garbage_classifier/
+/home/ubuntu/Capstone2AwsRest/src/main/resources/application.properties
