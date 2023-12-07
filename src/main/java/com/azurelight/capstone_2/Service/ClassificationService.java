@@ -7,13 +7,12 @@ import java.io.InputStreamReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class ClassificationService {
     private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
     public String doClassification(final String path) {
-        ProcessBuilder pb = new ProcessBuilder("/usr/bin/python3", 
-"/home/ubuntu/Capstone2AwsRest/src/main/resources/detector.py", path);
+        ProcessBuilder pb = new ProcessBuilder("/usr/bin/python3",
+                "/home/ubuntu/Capstone2AwsRest/src/main/resources/detector.py", path);
         pb.redirectErrorStream(true);
         Process p;
         String result = "";
@@ -37,7 +36,16 @@ public class ClassificationService {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        
+        int len = result.length();
+        int targetIdx = 0;
+        for (int i = len - 1; i <= 0; i--) {
+            if (result.charAt(i) == '{') {
+                targetIdx = i;
+                break;
+            }
+        }
 
-        return result;
+        return result.substring(targetIdx);
     }
 }
