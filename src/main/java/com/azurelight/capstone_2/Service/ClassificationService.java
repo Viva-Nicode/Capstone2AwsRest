@@ -12,7 +12,8 @@ public class ClassificationService {
     private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
     public String doClassification(final String path) {
-        ProcessBuilder pb = new ProcessBuilder("python", "./src/main/resources/detector.py", path);
+        ProcessBuilder pb = new ProcessBuilder("/usr/bin/python3", 
+"/home/ubuntu/Capstone2AwsRest/src/main/resources/detector.py", path);
         pb.redirectErrorStream(true);
         Process p;
         String result = "";

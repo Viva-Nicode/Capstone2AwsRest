@@ -1,15 +1,11 @@
 try:
     import numpy as np
     import tensorflow as tf
-    import tensorflow_hub as hub
     from PIL import Image
-    from uuid import uuid4
-    from subprocess import run, CalledProcessError
-    from os.path import splitext
-    from os import remove
     from sys import argv
+    from json import dumps
 
-    classification_model = tf.keras.models.load_model("/Users/nicode./MainSpace/aws_server/src/main/resources/garbage_classifier")
+    classification_model = tf.keras.models.load_model("/home/ubuntu/Capstone2AwsRest/src/main/resources/garbage_classifier")
     categoris = np.array(["battery", "cardboard", "clothes", "glass", "heating pad", "metal", "plastic", "shoes", "toothbrush"])
 
     def load_img(path):
@@ -28,8 +24,8 @@ try:
         idx = np.array(pred).argmax()
         result = categoris[idx]
         score = pred[0][idx]
-        return f"{result} : {score}"
+        return {"name" : result, "score" : float(score)}
 
-    print(runDetector(argv[1]))
+    print(dumps(runDetector(argv[1])))
 except Exception as e:
     print(e)

@@ -35,7 +35,7 @@ public class RestApiTestController {
 	public String PredictionRequest(@RequestParam(value = "image") MultipartFile pins) {
 		final String ext = pins.getContentType().split("/")[1];
 		final String uuidPinName = UUID.randomUUID() + "." + ext;
-		File dest = new File("./" + uuidPinName);
+		File dest = new File("/home/ubuntu/Capstone2AwsRest/src/main/resources/predictedImages/" + uuidPinName);
 
 		try {
 			BufferedInputStream bis = new BufferedInputStream(pins.getInputStream());
@@ -54,7 +54,7 @@ public class RestApiTestController {
 		// 경로를 서비스에 전달
 		// 결과값 클라이언트에 응답
 		ClassificationService cs = new ClassificationService();
-		String rr = cs.doClassification("./" + uuidPinName);
+		String rr = cs.doClassification("/home/ubuntu/Capstone2AwsRest/src/main/resources/predictedImages/" + uuidPinName);
 		log.error("============================================");
 		log.error(rr);
 		log.error("============================================");
