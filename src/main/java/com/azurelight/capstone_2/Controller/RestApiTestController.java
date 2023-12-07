@@ -6,9 +6,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.UUID;
-
+import java.util.List;
+import java.util.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,17 +19,27 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.Service.ClassificationService;
+import com.azurelight.capstone_2.db.User;
 
 
 @RestController
 @CrossOrigin
 @RequestMapping("/Rest")
 public class RestApiTestController {
+	@Autowired UserRepository ur;
+
 	private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 	@GetMapping("/getHelloworld")
 	public String moveSignupPage() {
 		return "hello world";
+	}
+
+	@GetMapping("/dbtest")
+	public String dbtest(){
+		List<User> uel = new ArrayList<User>(ur.findAll());
+		return uel.get(0).toString();
 	}
 
 	@RequestMapping(value = "/PredictionRequest", method = { RequestMethod.GET, RequestMethod.POST })
