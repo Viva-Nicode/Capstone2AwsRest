@@ -26,4 +26,4 @@ out/
 *.JPEG
 *.png
 *.PNG 
-/garbage_classifier
+src/main/resources/garbage_classifier/
