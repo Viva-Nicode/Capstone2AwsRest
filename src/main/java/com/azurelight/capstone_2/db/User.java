@@ -1,5 +1,10 @@
 package com.azurelight.capstone_2.db;
 
+import java.util.Date;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -11,16 +16,24 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "account")
+@Table(name = "user")
 @AllArgsConstructor
 @NoArgsConstructor
 public class User {
     @Id
-    private String email;
-    private String pw;
+    @Column(name = "id")
+    private String id;
 
-    @Override
-    public String toString() {
-        return this.email + " " + this.pw;
-    }
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "pw")
+    private String password;
+
+    @Column(name = "joindate")
+    @CreationTimestamp
+    private Date joindate;
+
+    @Column(name = "profile_image_path")
+    private String profile_image_path;
 }
