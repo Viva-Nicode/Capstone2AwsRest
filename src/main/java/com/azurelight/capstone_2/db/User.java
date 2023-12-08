@@ -11,7 +11,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "user")
+@Table(name = "account")
 @AllArgsConstructor
 @NoArgsConstructor
 public class User {
