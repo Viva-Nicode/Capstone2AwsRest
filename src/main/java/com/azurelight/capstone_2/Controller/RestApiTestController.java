@@ -2,19 +2,23 @@ package com.azurelight.capstone_2.Controller;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.UUID;
+
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -77,8 +81,6 @@ public class RestApiTestController {
 	@Autowired
 	private PasswordEncoder pe;
 
-
-
 	private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
 	@GetMapping("/echo")
@@ -87,7 +89,7 @@ public class RestApiTestController {
 	}
 
 	@PostMapping("/signin")
-	public Map<String, Object> signin(@RequestBody SignupRequestData req){
+	public Map<String, Object> signin(@RequestBody SignupRequestData req) {
 		List<User> l = ur.findByEmail(req.getEmail());
 
 		if (l.isEmpty())
@@ -102,13 +104,74 @@ public class RestApiTestController {
 	@ResponseBody
 	public Map<String, Object> signup(@RequestBody SignupRequestData req) {
 		if (ur.findByEmail(req.getEmail()).isEmpty()) {
-			ur.save(new User(UUID.randomUUID() + "", req.getEmail(), pe.encode(req.getPassword()), null, "default"));
+			ur.save(new User(UUID.randomUUID() + "", req.getEmail(), pe.encode(req.getPassword()), null, null));
 			return Map.of("requestResult", "signup success", "code", 0);
 		} else
 			return Map.of("requestResult", "Your email is duplicated.", "code", 1);
 	}
 
-	@RequestMapping(value = "/PredictionRequest", method = { RequestMethod.GET, RequestMethod.POST })
+	@GetMapping(value = "/get-profile/{email}")
+	public byte[] getRequestProfile(@PathVariable("email") String email) {
+		final User u = ur.findByEmail(email).get(0);
+		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image_path();
+		
+		if (u.getProfile_image_path() == null)
+			return null;
+		
+		File file = new File(path);
+
+		byte[] byteImage = null;
+
+		BufferedImage originalImage = null;
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		try {
+			originalImage = ImageIO.read(file);
+			ImageIO.write(originalImage, "jpg", baos);
+			baos.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (baos != null) {
+					baos.close();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		byteImage = baos.toByteArray();
+		return byteImage;
+	}
+
+	@PostMapping("/store-profile")
+	public String uploadProfile(@RequestParam(value = "image") MultipartFile profileImage,
+			@RequestParam(value = "email") String email) {
+		final String ext = profileImage.getContentType().split("/")[1];
+		final String profileImageName = UUID.randomUUID() + "." + ext;
+		File dest = new File("/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + profileImageName);
+
+		try {
+			BufferedInputStream bis = new BufferedInputStream(profileImage.getInputStream());
+			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
+			int bytesRead = 0;
+			byte[] buffer = new byte[1024];
+			while ((bytesRead = bis.read(buffer, 0, 1024)) != -1)
+				bos.write(buffer, 0, bytesRead);
+			bos.close();
+			bis.close();
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		int c = ur.updateUserprofile(profileImageName, email);
+		log.info("update result code : " + c);
+
+		String result = "ine";
+		return result;
+	}
+
+	@RequestMapping(value = "/predict", method = { RequestMethod.GET, RequestMethod.POST })
 	public String PredictionRequest(@RequestParam(value = "image") MultipartFile pins) {
 		final String ext = pins.getContentType().split("/")[1];
 		final String uuidPinName = UUID.randomUUID() + "." + ext;
