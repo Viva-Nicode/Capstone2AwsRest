@@ -36,4 +36,7 @@ public class User {
 
     @Column(name = "profile_image_path")
     private String profile_image_path;
+
+    @Column(name = "fcmtoken")
+    private String fcmtoken;
 }

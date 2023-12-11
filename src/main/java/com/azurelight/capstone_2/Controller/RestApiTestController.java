@@ -28,7 +28,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.Service.ClassificationService;
+import com.azurelight.capstone_2.Service.FCMService;
+import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
 import com.azurelight.capstone_2.db.User;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.AllArgsConstructor;
@@ -65,6 +69,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 class SignupRequestData {
 	private String email;
 	private String password;
+	private String fcmtoken;
 
 	@Override
 	public String toString() {
@@ -80,6 +85,9 @@ public class RestApiTestController {
 
 	@Autowired
 	private PasswordEncoder pe;
+
+	@Autowired
+	private FCMService fs;
 
 	private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
@@ -104,7 +112,7 @@ public class RestApiTestController {
 	@ResponseBody
 	public Map<String, Object> signup(@RequestBody SignupRequestData req) {
 		if (ur.findByEmail(req.getEmail()).isEmpty()) {
-			ur.save(new User(UUID.randomUUID() + "", req.getEmail(), pe.encode(req.getPassword()), null, null));
+			ur.save(new User(UUID.randomUUID() + "", req.getEmail(), pe.encode(req.getPassword()), null, null, req.getFcmtoken()));
 			return Map.of("requestResult", "signup success", "code", 0);
 		} else
 			return Map.of("requestResult", "Your email is duplicated.", "code", 1);
@@ -197,5 +205,16 @@ public class RestApiTestController {
 		log.error(rr);
 		log.error("============================================");
 		return rr;
+	}
+
+	@PostMapping(value = "/send-noti")
+	public String SendNotification(@RequestParam(value = "email") String email){
+		final User u = ur.findByEmail(email).get(0);
+		try {
+			fs.sendNotification(new NotificationRequest(u.getFcmtoken(), email, "test message"));
+		} catch (FirebaseMessagingException e) {
+			e.printStackTrace();
+		}
+		return "";
 	}
 }
