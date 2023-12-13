@@ -1,6 +1,6 @@
 package com.azurelight.capstone_2.db;
 
-import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicInsert;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -28,6 +28,7 @@ import java.util.Date;
 @Entity
 @Table(name = "chatmessage")
 @AllArgsConstructor
+@DynamicInsert
 @NoArgsConstructor
 public class ChatMessage implements Comparable<ChatMessage> {
     @Id
@@ -44,7 +45,6 @@ public class ChatMessage implements Comparable<ChatMessage> {
     private String chatDetail;
 
     @Column(name = "timestamp")
-    @CreationTimestamp
     private Date timestamp;
 
     @Override
