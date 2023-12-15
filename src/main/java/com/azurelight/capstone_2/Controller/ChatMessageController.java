@@ -156,6 +156,9 @@ public class ChatMessageController {
         List<Map<String, String>> result = new ArrayList<>();
 
         for (ChatMessage cm : lll) {
+            if (cm.getIsreadmsg() == false)
+                cr.updateIsreadMsg(cm.getId());
+
             if (cm.getFromId().equals(idEmailTable.get(me))) {
                 result.add(Map.of("chatId", cm.getId(),
                         "fromEmail", me,
