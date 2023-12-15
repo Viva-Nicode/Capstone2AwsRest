@@ -24,13 +24,11 @@ import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
 import com.azurelight.capstone_2.db.ChatMessage;
 import com.azurelight.capstone_2.db.User;
 import com.google.firebase.messaging.FirebaseMessagingException;
-import java.util.Optional;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.util.Collections;
 
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 
@@ -59,26 +57,24 @@ public class ChatMessageController {
 
         final ChatMessage insertedEntity = cr
                 .save(new ChatMessage(chatid, idEmailTable.get(sender), idEmailTable.get(receiver), detail,
-                        null));
-	final User u = ur.findByEmail(receiver).get(0);
+                        null, false));
+        final User u = ur.findByEmail(receiver).get(0);
 
-
-	ZoneId seoulZone = ZoneId.of("Asia/Seoul");
+        ZoneId seoulZone = ZoneId.of("Asia/Seoul");
 
         LocalDateTime seoulTime = LocalDateTime.now(seoulZone);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String formattedSeoulTime = seoulTime.format(formatter);
-	log.info("in con : " + formattedSeoulTime);
+        log.info("in con : " + formattedSeoulTime);
 
-        try {
-           fs.sendNotification(new NotificationRequest(u.getFcmtoken(), sender, detail),
-                    Map.of("chatid", insertedEntity.getId(), "detail", insertedEntity.getChatDetail(), "timestamp",
-                            formattedSeoulTime));
+        try {// 아래 notification을 mainmessageview에서도, chatlogview에서도 받음
+            fs.sendNotification(new NotificationRequest(u.getFcmtoken(), sender, detail),
+                    Map.of("chatid", insertedEntity.getId(), "detail", insertedEntity.getChatDetail(),
+                            "timestamp", formattedSeoulTime));
         } catch (FirebaseMessagingException e) {
             e.printStackTrace();
         }
-
         return chatid + "/" + formattedSeoulTime;
     }
 
@@ -100,27 +96,37 @@ public class ChatMessageController {
 
         List<ChatMessage> logs = cr.findAllLogs(me_id);
         Map<String, Msg> hm = new HashMap<>();
+        Map<String, Integer> unreadMessageCountMap = new HashMap<>();
 
         for (ChatMessage cm : logs) {
             String opneid = cm.getFromId().equals(me_id) ? cm.getToId() : cm.getFromId();
             final User opne = ur.findByuserid(opneid).get(0);
-            if (hm.containsKey(opne.getEmail())) {
-                // 키 이미 있다면
-                if (hm.get(opne.getEmail()).date.compareTo(cm.getTimestamp()) < 0) {
-                    // 기존 맵에 있던거보다 최신이라면
-                    hm.put(opne.getEmail(), new Msg(opneid, cm.getTimestamp(), cm.getChatDetail()));
-                }
+
+            if (unreadMessageCountMap.containsKey(opne.getEmail())) {
+                if (cm.getIsreadmsg() == false)
+                    unreadMessageCountMap.put(opne.getEmail(), unreadMessageCountMap.get(opne.getEmail()) + 1);
             } else {
-                hm.put(opne.getEmail(), new Msg(opneid, cm.getTimestamp(), cm.getChatDetail()));
+                if (cm.getIsreadmsg() == false)
+                    unreadMessageCountMap.put(opne.getEmail(), 1);
+                else
+                    unreadMessageCountMap.put(opne.getEmail(), 0);
             }
+
+            if (hm.containsKey(opne.getEmail())) {
+                if (hm.get(opne.getEmail()).date.compareTo(cm.getTimestamp()) < 0)
+                    hm.put(opne.getEmail(), new Msg(opneid, cm.getTimestamp(), cm.getChatDetail()));
+            } else
+                hm.put(opne.getEmail(), new Msg(opneid, cm.getTimestamp(), cm.getChatDetail()));
         }
+        System.out.println(unreadMessageCountMap);
 
         for (Map.Entry<String, Msg> elem : hm.entrySet()) {
             result.add(new HashMap<String, String>(Map.of("fromEmail", elem.getKey(),
                     "timeStamp", elem.getValue().date + "",
                     "text", elem.getValue().text,
                     "recentMessageId", elem.getValue().id,
-                    "profileImagePath", "http://52.78.99.139:8080/rest/get-profile/" + elem.getKey())));
+                    "profileImagePath", "http://52.78.99.139:8080/rest/get-profile/" + elem.getKey(),
+                    "unreadmsgcount", unreadMessageCountMap.get(elem.getKey()) + "")));
         }
 
         Collections.sort(result, new Comparator<Map<String, String>>() {

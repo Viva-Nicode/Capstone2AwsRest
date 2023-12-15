@@ -28,10 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.Service.ClassificationService;
-import com.azurelight.capstone_2.Service.FCMService;
-import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
 import com.azurelight.capstone_2.db.User;
-import com.google.firebase.messaging.FirebaseMessagingException;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.AllArgsConstructor;
@@ -84,9 +81,6 @@ public class RestApiTestController {
 
 	@Autowired
 	private PasswordEncoder pe;
-
-	@Autowired
-	private FCMService fs;
 
 	private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 

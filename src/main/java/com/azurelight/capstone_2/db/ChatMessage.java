@@ -47,6 +47,9 @@ public class ChatMessage implements Comparable<ChatMessage> {
     @Column(name = "timestamp")
     private Date timestamp;
 
+    @Column(name = "isreadmsg")
+    private Boolean isreadmsg;
+
     @Override
     public int compareTo(ChatMessage o) {
         return o.getTimestamp().compareTo(timestamp);
