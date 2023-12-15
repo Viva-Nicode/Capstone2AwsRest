@@ -25,6 +25,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
 
     @Modifying
     @Transactional
-    @Query("UPDATE chatmessage cm SET cm.isreadmsg = true where cm.chat_id = :chat_id")
+    @Query(value = "UPDATE chatmessage cm SET cm.isreadmsg = true where cm.chat_id = :chat_id", nativeQuery = true)
     int updateIsreadMsg(@Param(value = "chat_id") String chatid);
 }

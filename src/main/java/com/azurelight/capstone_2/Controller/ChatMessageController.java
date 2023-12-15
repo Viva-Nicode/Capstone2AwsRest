@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.HashMap;
 import java.util.Comparator;
 
@@ -68,14 +69,32 @@ public class ChatMessageController {
         String formattedSeoulTime = seoulTime.format(formatter);
         log.info("in con : " + formattedSeoulTime);
 
-        try {// 아래 notification을 mainmessageview에서도, chatlogview에서도 받음
+        try {
             fs.sendNotification(new NotificationRequest(u.getFcmtoken(), sender, detail),
-                    Map.of("chatid", insertedEntity.getId(), "detail", insertedEntity.getChatDetail(),
+                    Map.of("notitype", "receive", "chatid", insertedEntity.getId(), "detail",
+                            insertedEntity.getChatDetail(),
                             "timestamp", formattedSeoulTime));
         } catch (FirebaseMessagingException e) {
             e.printStackTrace();
         }
         return chatid + "/" + formattedSeoulTime;
+    }
+
+    @PostMapping("/readmsg")
+    public int reagMessage(@RequestParam(value = "chatid") String chatid) {
+        Optional<ChatMessage> m = cr.findById(chatid);
+        String fromid = m.get().getFromId();
+        System.out.println("fromid : " + fromid);
+        final User senderInfo = ur.findById(fromid).get();
+        System.out.println(senderInfo);
+        System.out.println(senderInfo.getFcmtoken());
+        try {
+            fs.sendNotification(new NotificationRequest(senderInfo.getFcmtoken(), "oops", "not receive msg"), Map.of("notitype","reply"));
+        } catch (FirebaseMessagingException e) {
+            e.printStackTrace();
+        }
+        return cr.updateIsreadMsg(chatid);
+        // 여기다가 메시지 보낸놈한테 읽었다고 노티 줘야함
     }
 
     @GetMapping("/get-recentmsg")
@@ -91,9 +110,6 @@ public class ChatMessageController {
             String text;
         }
 
-        // 키 : 상대 이메일
-        // 값 : 시간, 내용, 아이디
-
         List<ChatMessage> logs = cr.findAllLogs(me_id);
         Map<String, Msg> hm = new HashMap<>();
         Map<String, Integer> unreadMessageCountMap = new HashMap<>();
@@ -103,10 +119,10 @@ public class ChatMessageController {
             final User opne = ur.findByuserid(opneid).get(0);
 
             if (unreadMessageCountMap.containsKey(opne.getEmail())) {
-                if (cm.getIsreadmsg() == false)
+                if (cm.getIsreadmsg() == false && cm.getToId().equals(me_id))
                     unreadMessageCountMap.put(opne.getEmail(), unreadMessageCountMap.get(opne.getEmail()) + 1);
             } else {
-                if (cm.getIsreadmsg() == false)
+                if (cm.getIsreadmsg() == false && cm.getToId().equals(me_id))
                     unreadMessageCountMap.put(opne.getEmail(), 1);
                 else
                     unreadMessageCountMap.put(opne.getEmail(), 0);
