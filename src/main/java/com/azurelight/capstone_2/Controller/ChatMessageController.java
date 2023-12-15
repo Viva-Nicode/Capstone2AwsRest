@@ -84,12 +84,10 @@ public class ChatMessageController {
     public int reagMessage(@RequestParam(value = "chatid") String chatid) {
         Optional<ChatMessage> m = cr.findById(chatid);
         String fromid = m.get().getFromId();
-        System.out.println("fromid : " + fromid);
         final User senderInfo = ur.findById(fromid).get();
-        System.out.println(senderInfo);
-        System.out.println(senderInfo.getFcmtoken());
         try {
-            fs.sendNotification(new NotificationRequest(senderInfo.getFcmtoken(), "oops", "not receive msg"), Map.of("notitype","reply"));
+            fs.sendNotification(new NotificationRequest(senderInfo.getFcmtoken(), "hi~!!", "i am fxxking bug!"),
+                    Map.of("notitype", "reply", "chatid", chatid));
         } catch (FirebaseMessagingException e) {
             e.printStackTrace();
         }
@@ -172,7 +170,7 @@ public class ChatMessageController {
         List<Map<String, String>> result = new ArrayList<>();
 
         for (ChatMessage cm : lll) {
-            if (cm.getIsreadmsg() == false)
+            if (cm.getIsreadmsg() == false && cm.getToId().equals(idEmailTable.get(me)))
                 cr.updateIsreadMsg(cm.getId());
 
             if (cm.getFromId().equals(idEmailTable.get(me))) {
@@ -180,13 +178,15 @@ public class ChatMessageController {
                         "fromEmail", me,
                         "toEmail", audience,
                         "text", cm.getChatDetail(),
-                        "timeStamp", cm.getTimestamp().toString()));
+                        "timeStamp", cm.getTimestamp().toString(),
+                        "isread", cm.getIsreadmsg() + ""));
             } else {
                 result.add(Map.of("chatId", cm.getId(),
                         "fromEmail", audience,
                         "toEmail", me,
                         "text", cm.getChatDetail(),
-                        "timeStamp", cm.getTimestamp().toString()));
+                        "timeStamp", cm.getTimestamp().toString(),
+                        "isread", "none"));
             }
         }
         return result;
