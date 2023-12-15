@@ -205,15 +205,4 @@ public class RestApiTestController {
 		log.error("============================================");
 		return rr;
 	}
-
-	@PostMapping(value = "/send-noti")
-	public String SendNotification(@RequestParam(value = "email") String email){
-		final User u = ur.findByEmail(email).get(0);
-		try {
-			fs.sendNotification(new NotificationRequest(u.getFcmtoken(), email, "test message"));
-		} catch (FirebaseMessagingException e) {
-			e.printStackTrace();
-		}
-		return "";
-	}
 }

@@ -19,12 +19,7 @@ bin/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
-.vscode/
-*.jpg
-*.JPG
-*.jpeg
-*.JPEG
-*.png
-*.PNG 
+.vscode/ 
 src/main/resources/garbage_classifier/
 src/main/resources/application.properties
+src/main/resources/garbagecollector-1055b-firebase-adminsdk-o8vcg-6c7c381787.json

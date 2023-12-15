@@ -2,7 +2,7 @@ package com.azurelight.capstone_2.Controller;
 
 import java.util.UUID;
 import java.util.Date;
-
+import java.time.ZoneId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,11 +24,15 @@ import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
 import com.azurelight.capstone_2.db.ChatMessage;
 import com.azurelight.capstone_2.db.User;
 import com.google.firebase.messaging.FirebaseMessagingException;
-
+import java.util.Optional;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.util.Collections;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/chat")
@@ -56,16 +60,26 @@ public class ChatMessageController {
         final ChatMessage insertedEntity = cr
                 .save(new ChatMessage(chatid, idEmailTable.get(sender), idEmailTable.get(receiver), detail,
                         null));
+	final User u = ur.findByEmail(receiver).get(0);
 
-        final User u = ur.findByEmail(receiver).get(0);
+
+	ZoneId seoulZone = ZoneId.of("Asia/Seoul");
+
+        LocalDateTime seoulTime = LocalDateTime.now(seoulZone);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String formattedSeoulTime = seoulTime.format(formatter);
+	log.info("in con : " + formattedSeoulTime);
 
         try {
-            fs.sendNotification(new NotificationRequest(u.getFcmtoken(), sender, detail));
+           fs.sendNotification(new NotificationRequest(u.getFcmtoken(), sender, detail),
+                    Map.of("chatid", insertedEntity.getId(), "detail", insertedEntity.getChatDetail(), "timestamp",
+                            formattedSeoulTime));
         } catch (FirebaseMessagingException e) {
             e.printStackTrace();
         }
 
-        return chatid + "/" + insertedEntity.getTimestamp();
+        return chatid + "/" + formattedSeoulTime;
     }
 
     @GetMapping("/get-recentmsg")
