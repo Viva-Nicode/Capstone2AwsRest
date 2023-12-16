@@ -166,12 +166,16 @@ public class ChatMessageController {
         lll.addAll(cr.findByfromIdAndtoId(idEmailTable.get(audience), idEmailTable.get(me)));
         Collections.sort(lll);
         Collections.reverse(lll);
+        boolean isIamRead = false;
 
         List<Map<String, String>> result = new ArrayList<>();
 
         for (ChatMessage cm : lll) {
-            if (cm.getIsreadmsg() == false && cm.getToId().equals(idEmailTable.get(me)))
+            if (cm.getIsreadmsg() == false && cm.getToId().equals(idEmailTable.get(me))) {
+                // 만약 수신자가 나인 메시지가 false여서 true로 바꿨다면 상대가 보낸 메시지를 내가 읽었으므로 노티
+                isIamRead = true;
                 cr.updateIsreadMsg(cm.getId());
+            }
 
             if (cm.getFromId().equals(idEmailTable.get(me))) {
                 result.add(Map.of("chatId", cm.getId(),
@@ -189,6 +193,17 @@ public class ChatMessageController {
                         "isread", "none"));
             }
         }
+        final User opne = ur.findByuserid(idEmailTable.get(audience)).get(0);
+
+        if (isIamRead) {
+            try {
+                fs.sendNotification(new NotificationRequest(opne.getFcmtoken(), "hi~!!", "i am fxxking bug!"),
+                        Map.of("notitype", "reply", "chatid", "allMessage"));
+            } catch (FirebaseMessagingException e) {
+                e.printStackTrace();
+            }
+        }
+
         return result;
     }
 }
