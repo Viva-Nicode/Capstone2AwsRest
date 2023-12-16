@@ -22,6 +22,11 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     @Modifying
     @Transactional
+    @Query("UPDATE User u SET u.fcmtoken = :newToken where u.email = :email")
+    int updateFcmbyEmail(@Param(value = "email") String email, @Param(value = "newToken") String token);
+
+    @Modifying
+    @Transactional
     @Query("UPDATE User u SET u.profile_image_path = :newprofile where u.email = :email")
     int updateUserprofile(@Param(value = "newprofile") String newprofile, @Param(value = "email") String email);
 }

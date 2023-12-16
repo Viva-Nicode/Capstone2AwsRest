@@ -93,19 +93,25 @@ public class RestApiTestController {
 	public Map<String, Object> signin(@RequestBody SignupRequestData req) {
 		List<User> l = ur.findByEmail(req.getEmail());
 
-		if (l.isEmpty())
+		if (l.isEmpty()) {
 			return Map.of("requestResult", "Non-existent email.", "code", 1);
-		else if (!pe.matches(req.getPassword(), l.get(0).getPassword()))
+		} else if (!pe.matches(req.getPassword(), l.get(0).getPassword())) {
 			return Map.of("requestResult", "Password mismatch.", "code", 2);
-		else
+		} else {
+			if (!(l.get(0).getFcmtoken().equals(req.getFcmtoken()))) {
+				ur.updateFcmbyEmail(l.get(0).getEmail(), req.getFcmtoken());
+			}
 			return Map.of("requestResult", "sign in success.", "code", 0);
+		}
+
 	}
 
 	@PostMapping("/signup")
 	@ResponseBody
 	public Map<String, Object> signup(@RequestBody SignupRequestData req) {
 		if (ur.findByEmail(req.getEmail()).isEmpty()) {
-			ur.save(new User(UUID.randomUUID() + "", req.getEmail(), pe.encode(req.getPassword()), null, null, req.getFcmtoken()));
+			ur.save(new User(UUID.randomUUID() + "", req.getEmail(), pe.encode(req.getPassword()), null, null,
+					req.getFcmtoken()));
 			return Map.of("requestResult", "signup success", "code", 0);
 		} else
 			return Map.of("requestResult", "Your email is duplicated.", "code", 1);
@@ -115,10 +121,10 @@ public class RestApiTestController {
 	public byte[] getRequestProfile(@PathVariable("email") String email) {
 		final User u = ur.findByEmail(email).get(0);
 		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image_path();
-		
+
 		if (u.getProfile_image_path() == null)
 			return null;
-		
+
 		File file = new File(path);
 
 		byte[] byteImage = null;
