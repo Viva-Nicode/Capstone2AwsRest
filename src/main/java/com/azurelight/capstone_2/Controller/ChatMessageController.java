@@ -134,8 +134,9 @@ public class ChatMessageController {
         }
 
         for (Map.Entry<String, Msg> elem : hm.entrySet()) {
+            String timeString = elem.getValue().date.toString();
             result.add(new HashMap<String, String>(Map.of("fromEmail", elem.getKey(),
-                    "timeStamp", elem.getValue().date + "",
+                    "timeStamp", timeString.substring(0, timeString.length() - 2),
                     "text", elem.getValue().text,
                     "recentMessageId", elem.getValue().id,
                     "profileImagePath", "http://52.78.99.139:8080/rest/get-profile/" + elem.getKey(),
@@ -174,20 +175,21 @@ public class ChatMessageController {
                 isIamRead = true;
                 cr.updateIsreadMsg(cm.getId());
             }
+            String timeString = cm.getTimestamp().toString();
 
             if (cm.getFromId().equals(idEmailTable.get(me))) {
                 result.add(Map.of("chatId", cm.getId(),
                         "fromEmail", me,
                         "toEmail", audience,
                         "text", cm.getChatDetail(),
-                        "timeStamp", cm.getTimestamp().toString(),
+                        "timeStamp", timeString.substring(0, timeString.length() - 2),
                         "isread", cm.getIsreadmsg() + ""));
             } else {
                 result.add(Map.of("chatId", cm.getId(),
                         "fromEmail", audience,
                         "toEmail", me,
                         "text", cm.getChatDetail(),
-                        "timeStamp", cm.getTimestamp().toString(),
+                        "timeStamp", timeString.substring(0, timeString.length() - 2),
                         "isread", "none"));
             }
         }
