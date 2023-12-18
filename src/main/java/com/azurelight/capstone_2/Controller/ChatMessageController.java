@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.HashMap;
 import java.util.Comparator;
+import java.util.Set;
+import java.util.HashSet;
 
 import com.azurelight.capstone_2.Repository.ChatMessageRepository;
 import com.azurelight.capstone_2.Repository.UserRepository;
@@ -62,12 +64,10 @@ public class ChatMessageController {
         final User u = ur.findByEmail(receiver).get(0);
 
         ZoneId seoulZone = ZoneId.of("Asia/Seoul");
-
         LocalDateTime seoulTime = LocalDateTime.now(seoulZone);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String formattedSeoulTime = seoulTime.format(formatter);
-        log.info("in con : " + formattedSeoulTime);
 
         try {
             fs.sendNotification(new NotificationRequest(u.getFcmtoken(), sender, detail),
@@ -149,7 +149,6 @@ public class ChatMessageController {
                 return o1.get("timestamp").compareTo(o2.get("timestamp"));
             }
         });
-
         return result;
     }
 
@@ -202,6 +201,27 @@ public class ChatMessageController {
             } catch (FirebaseMessagingException e) {
                 e.printStackTrace();
             }
+        }
+
+        return result;
+    }
+
+    @GetMapping("/get-newusers")
+    public List<Map<String, String>> getNewUsers(@RequestParam(value = "me") String me) {
+        List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+        List<User> allUsers = ur.findAll();
+        final String me_id = ur.findByEmail(me).get(0).getId();
+        List<ChatMessage> logs = cr.findAllLogs(me_id);
+        Set<String> s = new HashSet<>();
+
+        for (ChatMessage cm : logs) {
+            s.add(cm.getFromId());
+            s.add(cm.getToId());
+        }
+
+        for (User u : allUsers) {
+            if (!(s.contains(u.getId())))
+                result.add(Map.of("userEmail", u.getEmail()));
         }
 
         return result;

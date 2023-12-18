@@ -103,7 +103,6 @@ public class RestApiTestController {
 			}
 			return Map.of("requestResult", "sign in success.", "code", 0);
 		}
-
 	}
 
 	@PostMapping("/signup")
