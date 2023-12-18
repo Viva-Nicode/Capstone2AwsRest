@@ -132,7 +132,6 @@ public class ChatMessageController {
             } else
                 hm.put(opne.getEmail(), new Msg(opneid, cm.getTimestamp(), cm.getChatDetail()));
         }
-        System.out.println(unreadMessageCountMap);
 
         for (Map.Entry<String, Msg> elem : hm.entrySet()) {
             result.add(new HashMap<String, String>(Map.of("fromEmail", elem.getKey(),
@@ -229,7 +228,7 @@ public class ChatMessageController {
     }
 
     @PostMapping("/newchat")
-    public String startNewChat(@RequestParam(value = "me") String me,
+    public Map<String, String> startNewChat(@RequestParam(value = "me") String me,
             @RequestParam(value = "audience") String audience) {
 
         final String detail = "hello! " + audience;
@@ -259,6 +258,8 @@ public class ChatMessageController {
         } catch (FirebaseMessagingException e) {
             e.printStackTrace();
         }
-        return "lilpa kawai";
+        return Map.of("recentMessageId", u.getId(), "text", detail, "fromEmail", audience, "unreadmsgcount", "0",
+                "timeStamp", formattedSeoulTime, "profileImagePath",
+                "http://52.78.99.139:8080/rest/get-profile/" + audience);
     }
 }
