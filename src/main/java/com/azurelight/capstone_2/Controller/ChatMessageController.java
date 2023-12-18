@@ -218,6 +218,7 @@ public class ChatMessageController {
             s.add(cm.getFromId());
             s.add(cm.getToId());
         }
+        s.add(me_id);
 
         for (User u : allUsers) {
             if (!(s.contains(u.getId())))
@@ -225,5 +226,39 @@ public class ChatMessageController {
         }
 
         return result;
+    }
+
+    @PostMapping("/newchat")
+    public String startNewChat(@RequestParam(value = "me") String me,
+            @RequestParam(value = "audience") String audience) {
+
+        final String detail = "hello! " + audience;
+
+        final Map<String, String> emailToIdMap = new HashMap<>(
+                Map.of(me, ur.findByEmail(me).get(0).getId(),
+                        audience, ur.findByEmail(audience).get(0).getId()));
+
+        final String chatid = UUID.randomUUID() + "";
+
+        final ChatMessage insertedEntity = cr
+                .save(new ChatMessage(chatid, emailToIdMap.get(me), emailToIdMap.get(audience), detail,
+                        null, false));
+        final User u = ur.findByEmail(audience).get(0);
+
+        ZoneId seoulZone = ZoneId.of("Asia/Seoul");
+        LocalDateTime seoulTime = LocalDateTime.now(seoulZone);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String formattedSeoulTime = seoulTime.format(formatter);
+
+        try {
+            fs.sendNotification(new NotificationRequest(u.getFcmtoken(), me, detail),
+                    Map.of("notitype", "receive", "chatid", insertedEntity.getId(), "detail",
+                            insertedEntity.getChatDetail(),
+                            "timestamp", formattedSeoulTime));
+        } catch (FirebaseMessagingException e) {
+            e.printStackTrace();
+        }
+        return "lilpa kawai";
     }
 }
