@@ -229,6 +229,24 @@ public class ChatMessageController {
         return result;
     }
 
+    @PostMapping("/exit-chat")
+    public String exitChattingRoom(@RequestParam(value = "me") String me,
+            @RequestParam(value = "audience") String audience) {
+
+        final Map<String, String> emailToIdMap = new HashMap<>(
+                Map.of(audience, ur.findByEmail(audience).get(0).getId(),
+                        me, ur.findByEmail(me).get(0).getId()));
+
+        List<ChatMessage> lll = new ArrayList<>();
+        lll.addAll(cr.findByfromIdAndtoId(emailToIdMap.get(me), emailToIdMap.get(audience)));
+        lll.addAll(cr.findByfromIdAndtoId(emailToIdMap.get(audience), emailToIdMap.get(me)));
+
+        for (ChatMessage cm : lll)
+            cr.delete(cm);
+
+        return "done";
+    }
+
     @PostMapping("/newchat")
     public Map<String, String> startNewChat(@RequestParam(value = "me") String me,
             @RequestParam(value = "audience") String audience) {
