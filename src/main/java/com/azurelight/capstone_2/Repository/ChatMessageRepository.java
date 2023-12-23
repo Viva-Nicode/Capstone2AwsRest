@@ -12,20 +12,21 @@ import com.azurelight.capstone_2.db.ChatMessage;
 
 import jakarta.transaction.Transactional;
 
+// mysql> desc chatmessage;
+// +-------------+--------------+------+-----+---------+-------------------+
+// | Field       | Type         | Null | Key | Default | Extra             |
+// +-------------+--------------+------+-----+---------+-------------------+
+// | chatid      | char(36)     | NO   | PRI | NULL    |                   |
+// | identifier  | char(36)     | NO   | MUL | NULL    |                   |
+// | detail      | varchar(512) | NO   |     | NULL    |                   |
+// | timestamp   | datetime     | NO   |     | now()   | DEFAULT_GENERATED |
+// | unreadcount | int          | NO   |     | NULL    |                   |
+// +-------------+--------------+------+-----+---------+-------------------+
+
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, String> {
 
-    @Query(value = "SELECT * FROM chatmessage cm where cm.from_id = :fromid and cm.to_id = :toid", nativeQuery = true)
-    List<ChatMessage> findByfromIdAndtoId(@Param("fromid") String from_id, @Param("toid") String to_id);
-
-    @Query(value = "SELECT * FROM chatmessage cm WHERE cm.from_id = :id or cm.to_id = :id", nativeQuery = true)
-    List<ChatMessage> findAllLogs(@Param("id") String id);
-
-    Optional<ChatMessage> findById(String id);
-
-    @Modifying
-    @Transactional
-    @Query(value = "UPDATE chatmessage cm SET cm.isreadmsg = true where cm.chat_id = :chat_id", nativeQuery = true)
-    int updateIsreadMsg(@Param(value = "chat_id") String chatid);
+    @Query(value = "select * from chatmessage cm where cm.identifier = :identifier", nativeQuery = true)
+    List<ChatMessage> findByIdentifier(@Param("identifier") String identifier);
 
 }

@@ -1,5 +1,6 @@
 package com.azurelight.capstone_2.db;
 
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
 
 import jakarta.persistence.Column;
@@ -12,16 +13,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.util.Date;
 
-// desc chatmessage
-// +-------------+--------------+------+-----+---------+-------+
-// | Field       | Type         | Null | Key | Default | Extra |
-// +-------------+--------------+------+-----+---------+-------+
-// | chat_id     | char(36)     | NO   | PRI | NULL    |       |
-// | from_id     | varchar(255) | NO   | MUL | NULL    |       |
-// | to_id       | varchar(255) | NO   | MUL | NULL    |       |
-// | chat_detail | varchar(512) | NO   |     | NULL    |       |
-// | timestamp   | datetime     | NO   |     | NULL    |       |
-// +-------------+--------------+------+-----+---------+-------+
+// mysql> desc chatmessage;
+// +-------------+--------------+------+-----+---------+-------------------+
+// | Field       | Type         | Null | Key | Default | Extra             |
+// +-------------+--------------+------+-----+---------+-------------------+
+// | chatid      | char(36)     | NO   | PRI | NULL    |                   |
+// | identifier  | char(36)     | NO   | MUL | NULL    |                   |
+// | detail      | varchar(512) | NO   |     | NULL    |                   |
+// | timestamp   | datetime     | NO   |     | now()   | DEFAULT_GENERATED |
+// | unreadcount | int          | NO   |     | NULL    |                   |
+// +-------------+--------------+------+-----+---------+-------------------+
 
 @Getter
 @Setter
@@ -32,26 +33,29 @@ import java.util.Date;
 @NoArgsConstructor
 public class ChatMessage implements Comparable<ChatMessage> {
     @Id
-    @Column(name = "chat_id")
-    private String id;
+    @Column(name = "chatid")
+    private String chatid;
 
-    @Column(name = "from_id")
-    private String fromId;
+    @Column(name = "identifier")
+    private String identifier;
 
-    @Column(name = "to_id")
-    private String toId;
+    @Column(name = "detail")
+    private String detail;
 
-    @Column(name = "chat_detail")
-    private String chatDetail;
-
+    @CreationTimestamp
     @Column(name = "timestamp")
     private Date timestamp;
 
-    @Column(name = "isreadmsg")
-    private Boolean isreadmsg;
+    @Column(name = "unreadcount")
+    private int unreadcount;
 
     @Override
     public int compareTo(ChatMessage o) {
         return o.getTimestamp().compareTo(timestamp);
+    }
+
+    public String getRecentTimestamAsString() {
+        String s = this.timestamp + "";
+        return s.substring(0, s.length() - 2);
     }
 }

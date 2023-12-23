@@ -1,8 +1,9 @@
 package com.azurelight.capstone_2.Controller;
 
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.Date;
-import java.time.ZoneId;
+import static java.util.stream.Collectors.toCollection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.threeten.bp.LocalDateTime;
+import org.threeten.bp.ZoneId;
+import org.threeten.bp.format.DateTimeFormatter;
+
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
@@ -21,19 +26,22 @@ import java.util.Set;
 import java.util.HashSet;
 
 import com.azurelight.capstone_2.Repository.ChatMessageRepository;
+import com.azurelight.capstone_2.Repository.ChatroomRepository;
+import com.azurelight.capstone_2.Repository.ChatroomuserRepository;
 import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.Service.FCMService;
+import com.azurelight.capstone_2.Service.Utility;
 import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
 import com.azurelight.capstone_2.db.ChatMessage;
+import com.azurelight.capstone_2.db.Chatroom;
+import com.azurelight.capstone_2.db.Chatroomuser;
 import com.azurelight.capstone_2.db.User;
 import com.google.firebase.messaging.FirebaseMessagingException;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.util.Collections;
-
-import java.time.format.DateTimeFormatter;
-import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/chat")
@@ -41,245 +49,282 @@ public class ChatMessageController {
     private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
     @Autowired
-    private UserRepository ur;
+    private UserRepository userRepository;
 
     @Autowired
-    private ChatMessageRepository cr;
+    private ChatMessageRepository chatMessageRepository;
 
     @Autowired
     private FCMService fs;
 
-    @PostMapping("/send-msg")
-    public String sendMessage(@RequestParam(value = "sender") String sender,
-            @RequestParam(value = "receiver") String receiver, @RequestParam(value = "detail") String detail) {
+    @Autowired
+    private ChatroomuserRepository chatroomuserRepository;
 
-        final Map<String, String> idEmailTable = new HashMap<>(
-                Map.of(sender, ur.findByEmail(sender).get(0).getId(),
-                        receiver, ur.findByEmail(receiver).get(0).getId()));
+    @Autowired
+    private ChatroomRepository chatroomRepository;
+
+    @PostMapping("/send-msg")
+    public Map<String, Object> sendMessage(@RequestParam(value = "chatroomid") String chatroomid,
+            @RequestParam(value = "me") String me, @RequestParam(value = "detail") String detail) {
+
         final String chatid = UUID.randomUUID() + "";
 
-        final ChatMessage insertedEntity = cr
-                .save(new ChatMessage(chatid, idEmailTable.get(sender), idEmailTable.get(receiver), detail,
-                        null, false));
-        final User u = ur.findByEmail(receiver).get(0);
+        String identifier = chatroomuserRepository.findIdentifierByRoomidAndEmail(chatroomid, me).get(0);
+        chatMessageRepository.save(new ChatMessage(chatid, identifier, detail, null, 0));
+        String currentTime = Utility.getCurrentDateTimeAsString();
 
-        ZoneId seoulZone = ZoneId.of("Asia/Seoul");
-        LocalDateTime seoulTime = LocalDateTime.now(seoulZone);
+        List<Chatroomuser> userlistinroomAll = chatroomuserRepository.findByRoomid(chatroomid);
+        List<Chatroomuser> userlistinroom = userlistinroomAll.stream().filter(u -> u.isState()).toList();
+        System.out.println(userlistinroomAll);
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        String formattedSeoulTime = seoulTime.format(formatter);
+        String audienceList = String.join(" ", userlistinroomAll.stream().map(Chatroomuser::getEmail).toList());
+        System.out.println(audienceList);
+
+        List<NotificationRequest> notificationRequestList = new ArrayList<>(); //이게 비어있음
+
+        for (Chatroomuser u : userlistinroom) {
+            if (!u.getEmail().equals(me)) {
+                String fcmtoken = userRepository.findById(u.getEmail()).get().getFcmtoken();
+                notificationRequestList.add(new NotificationRequest(fcmtoken, me, detail));
+            }
+        }
 
         try {
-            fs.sendNotification(new NotificationRequest(u.getFcmtoken(), sender, detail),
-                    Map.of("notitype", "receive", "chatid", insertedEntity.getId(), "detail",
-                            insertedEntity.getChatDetail(),
-                            "timestamp", formattedSeoulTime));
+            fs.sendNotificationAll(notificationRequestList,
+                    Map.of("notitype", "receive",
+                            "roomid", chatroomid,
+                            "chatid", chatid,
+                            "detail", detail,
+                            "timestamp", currentTime,
+                            "audiencelist", audienceList));
         } catch (FirebaseMessagingException e) {
             e.printStackTrace();
         }
-        return chatid + "/" + formattedSeoulTime;
+        chatroomRepository.updateRecentInfo(chatroomid, detail);
+
+        // try {
+        // fs.sendNotification(new NotificationRequest(u.getFcmtoken(), me, detail),
+        // Map.of("notitype", "receive", "chatid", insertedEntity.getId(), "detail",
+        // insertedEntity.getChatDetail(),
+        // "timestamp", formattedSeoulTime));
+        // } catch (FirebaseMessagingException e) {
+        // e.printStackTrace();
+        // }
+        return Map.of("chatId", chatid, "writer", me, "text", detail, "timestamp", currentTime);
     }
 
-    @PostMapping("/readmsg")
-    public int reagMessage(@RequestParam(value = "chatid") String chatid) {
-        Optional<ChatMessage> m = cr.findById(chatid);
-        String fromid = m.get().getFromId();
-        final User senderInfo = ur.findById(fromid).get();
-        try {
-            fs.sendNotification(new NotificationRequest(senderInfo.getFcmtoken(), "hi~!!", "i am fxxking bug!"),
-                    Map.of("notitype", "reply", "chatid", chatid));
-        } catch (FirebaseMessagingException e) {
-            e.printStackTrace();
-        }
-        return cr.updateIsreadMsg(chatid);
-        // 여기다가 메시지 보낸놈한테 읽었다고 노티 줘야함
-    }
+    // @PostMapping("/readmsg")
+    // public int reagMessage(@RequestParam(value = "chatid") String chatid) {
+    // Optional<ChatMessage> m = cr.findById(chatid);
+    // String fromid = m.get().getFromId();
+    // final User senderInfo = ur.findById(fromid).get();
+    // try {
+    // fs.sendNotification(new NotificationRequest(senderInfo.getFcmtoken(),
+    // "hi~!!", "i am fxxking bug!"),
+    // Map.of("notitype", "reply", "chatid", chatid));
+    // } catch (FirebaseMessagingException e) {
+    // e.printStackTrace();
+    // }
+    // return cr.updateIsreadMsg(chatid);
+    // }
 
     @GetMapping("/get-recentmsg")
-    public List<HashMap<String, String>> getRecentMessages(@RequestParam(value = "me") String me) {
-        final String me_id = ur.findByEmail(me).get(0).getId();
-        List<HashMap<String, String>> result = new ArrayList<HashMap<String, String>>();
+    public List<HashMap<String, Object>> getRecentMessages(@RequestParam(value = "me") String me) {
 
-        @AllArgsConstructor
-        @Getter
-        class Msg {
-            String id;
-            Date date;
-            String text;
+        List<HashMap<String, Object>> result = new ArrayList<HashMap<String, Object>>();
+
+        // 본인이 소속된 톡방의 룸아이디 목록을 state를 고려하여 가져온다.
+        List<String> roomids = chatroomuserRepository.findRoomidByEmail(me);
+
+        for (String roomid : roomids) {
+            // 룸아이디로 톡방 정보를 가져온다.
+            Chatroom chatroom = chatroomRepository.findById(roomid).get();
+
+            // 해당 톡방에 소속된 유저들의 목록을 가져온다. state는 고려하지 않는다.
+            List<Chatroomuser> affiliatedUsersInChatroom = chatroomuserRepository.findByRoomid(roomid);
+
+            List<String> audienceList = affiliatedUsersInChatroom.stream().filter(u -> !u.getEmail().equals(me))
+                    .map(Chatroomuser::getEmail).toList();
+
+            result.add(new HashMap<String, Object>(Map.of(
+                    "timestamp", chatroom.getRecentTimestamAsString(),
+                    "text", chatroom.getRecent_detail(),
+                    "chatroomid", chatroom.getRoomid(),
+                    "audienceList", audienceList,
+                    "unreadmsgcount", 0)));
         }
-
-        List<ChatMessage> logs = cr.findAllLogs(me_id);
-        Map<String, Msg> hm = new HashMap<>();
-        Map<String, Integer> unreadMessageCountMap = new HashMap<>();
-
-        for (ChatMessage cm : logs) {
-            String opneid = cm.getFromId().equals(me_id) ? cm.getToId() : cm.getFromId();
-            final User opne = ur.findByuserid(opneid).get(0);
-
-            if (unreadMessageCountMap.containsKey(opne.getEmail())) {
-                if (cm.getIsreadmsg() == false && cm.getToId().equals(me_id))
-                    unreadMessageCountMap.put(opne.getEmail(), unreadMessageCountMap.get(opne.getEmail()) + 1);
-            } else {
-                if (cm.getIsreadmsg() == false && cm.getToId().equals(me_id))
-                    unreadMessageCountMap.put(opne.getEmail(), 1);
-                else
-                    unreadMessageCountMap.put(opne.getEmail(), 0);
-            }
-
-            if (hm.containsKey(opne.getEmail())) {
-                if (hm.get(opne.getEmail()).date.compareTo(cm.getTimestamp()) < 0)
-                    hm.put(opne.getEmail(), new Msg(opneid, cm.getTimestamp(), cm.getChatDetail()));
-            } else
-                hm.put(opne.getEmail(), new Msg(opneid, cm.getTimestamp(), cm.getChatDetail()));
-        }
-
-        for (Map.Entry<String, Msg> elem : hm.entrySet()) {
-            String timeString = elem.getValue().date.toString();
-            result.add(new HashMap<String, String>(Map.of("fromEmail", elem.getKey(),
-                    "timeStamp", timeString.substring(0, timeString.length() - 2),
-                    "text", elem.getValue().text,
-                    "recentMessageId", elem.getValue().id,
-                    "profileImagePath", "http://52.78.99.139:8080/rest/get-profile/" + elem.getKey(),
-                    "unreadmsgcount", unreadMessageCountMap.get(elem.getKey()) + "")));
-        }
-
-        Collections.sort(result, new Comparator<Map<String, String>>() {
-            @Override
-            public int compare(Map<String, String> o1, Map<String, String> o2) {
-                return o1.get("timestamp").compareTo(o2.get("timestamp"));
-            }
-        });
         return result;
     }
 
     @GetMapping("/get-chatlogs")
-    public List<Map<String, String>> getChatlogs(@RequestParam(value = "me") String me,
-            @RequestParam(value = "audience") String audience) {
+    public Map<String, Object> getChatlogs(@RequestParam(value = "chatroomid") String roomid) {
 
-        final Map<String, String> idEmailTable = new HashMap<>(
-                Map.of(audience, ur.findByEmail(audience).get(0).getId(),
-                        me, ur.findByEmail(me).get(0).getId()));
+        List<Chatroomuser> userListInRoom = chatroomuserRepository.findByRoomid(roomid);
+        Map<String, String> identifierToEmailMap = new HashMap<>();
+        List<ChatMessage> messageList = new ArrayList<>();
+        List<HashMap<String, Object>> chatloglist = new ArrayList<HashMap<String, Object>>();
 
-        List<ChatMessage> lll = new ArrayList<>();
-        lll.addAll(cr.findByfromIdAndtoId(idEmailTable.get(me), idEmailTable.get(audience)));
-        lll.addAll(cr.findByfromIdAndtoId(idEmailTable.get(audience), idEmailTable.get(me)));
-        Collections.sort(lll);
-        Collections.reverse(lll);
-        boolean isIamRead = false;
-
-        List<Map<String, String>> result = new ArrayList<>();
-
-        for (ChatMessage cm : lll) {
-            if (cm.getIsreadmsg() == false && cm.getToId().equals(idEmailTable.get(me))) {
-                // 만약 수신자가 나인 메시지가 false여서 true로 바꿨다면 상대가 보낸 메시지를 내가 읽었으므로 노티
-                isIamRead = true;
-                cr.updateIsreadMsg(cm.getId());
-            }
-            String timeString = cm.getTimestamp().toString();
-
-            if (cm.getFromId().equals(idEmailTable.get(me))) {
-                result.add(Map.of("chatId", cm.getId(),
-                        "fromEmail", me,
-                        "toEmail", audience,
-                        "text", cm.getChatDetail(),
-                        "timeStamp", timeString.substring(0, timeString.length() - 2),
-                        "isread", cm.getIsreadmsg() + ""));
-            } else {
-                result.add(Map.of("chatId", cm.getId(),
-                        "fromEmail", audience,
-                        "toEmail", me,
-                        "text", cm.getChatDetail(),
-                        "timeStamp", timeString.substring(0, timeString.length() - 2),
-                        "isread", "none"));
-            }
-        }
-        final User opne = ur.findByuserid(idEmailTable.get(audience)).get(0);
-
-        if (isIamRead) {
-            try {
-                fs.sendNotification(new NotificationRequest(opne.getFcmtoken(), "hi~!!", "i am fxxking bug!"),
-                        Map.of("notitype", "reply", "chatid", "allMessage"));
-            } catch (FirebaseMessagingException e) {
-                e.printStackTrace();
-            }
+        for (Chatroomuser cru : userListInRoom) {
+            messageList.addAll(chatMessageRepository.findByIdentifier(cru.getIdentifier()));
+            identifierToEmailMap.put(cru.getIdentifier(), cru.getEmail());
         }
 
-        return result;
+        Collections.sort(messageList);
+        Collections.reverse(messageList);
+
+        for (ChatMessage cm : messageList) {
+            chatloglist.add(new HashMap<String, Object>(Map.of(
+                    "chatId", cm.getChatid(),
+                    "writer", identifierToEmailMap.get(cm.getIdentifier()),
+                    "text", cm.getDetail(),
+                    "timestamp", cm.getRecentTimestamAsString())));
+        }
+
+        List<Chatroomuser> joinedUserList = chatroomuserRepository.findByRoomid(roomid);
+        List<HashMap<String, String>> joinedusermap = new ArrayList<HashMap<String, String>>();
+
+        for (Chatroomuser u : joinedUserList) {
+            joinedusermap.add(new HashMap<String, String>(Map.of(
+                    "email", u.getEmail(), "nickname", u.getNickname())));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("chatloglist", chatloglist);
+        response.put("joineduserlist", joinedusermap);
+
+        // List<ChatMessage> lll = new ArrayList<>();
+        // lll.addAll(cr.findByfromIdAndtoId(idEmailTable.get(me),
+        // idEmailTable.get(audience)));
+        // lll.addAll(cr.findByfromIdAndtoId(idEmailTable.get(audience),
+        // idEmailTable.get(me)));
+        // Collections.sort(lll);
+        // Collections.reverse(lll);
+        // boolean isIamRead = false;
+
+        // List<Map<String, String>> result = new ArrayList<>();
+
+        // for (ChatMessage cm : lll) {
+        // if (cm.getIsreadmsg() == false && cm.getToId().equals(idEmailTable.get(me)))
+        // {
+        // isIamRead = true;
+        // cr.updateIsreadMsg(cm.getId());
+        // }
+        // String timeString = cm.getTimestamp().toString();
+
+        // if (cm.getFromId().equals(idEmailTable.get(me))) {
+        // result.add(Map.of("chatId", cm.getId(),
+        // "fromEmail", me,
+        // "toEmail", audience,
+        // "text", cm.getChatDetail(),
+        // "timeStamp", timeString.substring(0, timeString.length() - 2),
+        // "isread", cm.getIsreadmsg() + ""));
+        // } else {
+        // result.add(Map.of("chatId", cm.getId(),
+        // "fromEmail", audience,
+        // "toEmail", me,
+        // "text", cm.getChatDetail(),
+        // "timeStamp", timeString.substring(0, timeString.length() - 2),
+        // "isread", "none"));
+        // }
+        // }
+        // final User opne = ur.findByuserid(idEmailTable.get(audience)).get(0);
+
+        // if (isIamRead) {
+        // try {
+        // fs.sendNotification(new NotificationRequest(opne.getFcmtoken(), "hi~!!", "iam
+        // fxxking bug!"),
+        // Map.of("notitype", "reply", "chatid", "allMessage"));
+        // } catch (FirebaseMessagingException e) {
+        // e.printStackTrace();
+        // }
+        // }
+
+        return response;
     }
 
     @GetMapping("/get-newusers")
     public List<Map<String, String>> getNewUsers(@RequestParam(value = "me") String me) {
-        List<Map<String, String>> result = new ArrayList<Map<String, String>>();
-        List<User> allUsers = ur.findAll();
-        final String me_id = ur.findByEmail(me).get(0).getId();
-        List<ChatMessage> logs = cr.findAllLogs(me_id);
-        Set<String> s = new HashSet<>();
 
-        for (ChatMessage cm : logs) {
-            s.add(cm.getFromId());
-            s.add(cm.getToId());
+        System.out.println("in get-newusers me : " + me);
+        // 처음부터 방이 존재하지 않았거나
+        // 내가 나갔거나
+        // 한명이 추가되서 단톡방이 되어버렸거나
+        // 내가 나갔는데 한명이 추가되서 단톡이 되어버렸거나
+
+        List<Map<String, String>> response = new ArrayList<Map<String, String>>();
+
+        List<User> allUsers = userRepository.findAll();
+        Set<String> s = new HashSet<>();
+        s.add(me);
+
+        for (String roomid : chatroomuserRepository.findRoomidByEmail(me)) {
+            // 해당 톡방에 state 고려하지 않고 참여한 모든 유저목록을 가져온다.
+            List<Chatroomuser> affiliatedUsersInChatroom = chatroomuserRepository.findByRoomid(roomid);
+
+            if (affiliatedUsersInChatroom.size() <= 2) {
+                affiliatedUsersInChatroom.stream().forEach(u -> s.add(u.getEmail()));
+                // 갠톡방에 존재하므로 추가가능친구목록에서 제외된다. 즉, 새로운 유저 목록에 보이지 않게 된다.
+            }
         }
-        s.add(me_id);
 
         for (User u : allUsers) {
-            if (!(s.contains(u.getId())))
-                result.add(Map.of("userEmail", u.getEmail()));
+            if (!s.contains(u.getEmail()))
+                response.add(Map.of("userEmail", u.getEmail()));
         }
 
-        return result;
+        return response;
+    }
+
+    @PostMapping("/newchat")
+    public Map<String, Object> startNewChat(@RequestParam(value = "me") String me,
+            @RequestParam(value = "audience") String audience) {
+
+        // 너랑나 단둘이만 있는 갠톡을 찾는다.
+        // 없다면 새로 생성한다. chatroom.save()
+        // 있다면 true로 바꿔준다. 이미 true인경우는 정상적이라면 없어야 함(있어도 문제는 안됨)
+
+        boolean isFindWeAreAlone = true;
+        Chatroom recentChatroom = null;
+
+        for (Chatroom chatroom : chatroomRepository.findAll()) {
+            Set<String> s = new HashSet<>(
+                    chatroomuserRepository.findByRoomid(chatroom.getRoomid()).stream().map(Chatroomuser::getEmail)
+                            .collect(toCollection(HashSet::new)));
+            boolean pred = Arrays.asList(me, audience).stream().allMatch(u -> s.contains(u)) && s.size() == 2;
+
+            if (pred) {
+                System.out.println("if로 들어왔다고??");
+                isFindWeAreAlone = false;
+                recentChatroom = chatroom;
+                chatroomuserRepository.updateChatroomuserState(chatroom.getRoomid(), me);
+                break;
+            }
+        }
+
+        if (isFindWeAreAlone) {
+            // 새로운 톡방 개설
+            final String roomid = UUID.randomUUID() + "";
+            chatroomRepository.save(new Chatroom(roomid, 2, "", null));
+            chatroomuserRepository.save(new Chatroomuser(UUID.randomUUID() + "", roomid, me, me, true));
+            chatroomuserRepository.save(new Chatroomuser(UUID.randomUUID() + "", roomid, audience, audience, true));
+            return Map.of("chatroomid", roomid,
+                    "text", "",
+                    "timestamp", Utility.getCurrentDateTimeAsString(),
+                    "audienceList", Arrays.asList(audience),
+                    "unreadmsgcount", 0);
+        } else {
+            return Map.of("chatroomid", recentChatroom.getRoomid(),
+                    "text", recentChatroom.getRecent_detail(),
+                    "timestamp", recentChatroom.getRecentTimestamAsString(),
+                    "audienceList", Arrays.asList(audience),
+                    "unreadmsgcount", 0);
+        }
     }
 
     @PostMapping("/exit-chat")
     public String exitChattingRoom(@RequestParam(value = "me") String me,
-            @RequestParam(value = "audience") String audience) {
-
-        final Map<String, String> emailToIdMap = new HashMap<>(
-                Map.of(audience, ur.findByEmail(audience).get(0).getId(),
-                        me, ur.findByEmail(me).get(0).getId()));
-
-        List<ChatMessage> lll = new ArrayList<>();
-        lll.addAll(cr.findByfromIdAndtoId(emailToIdMap.get(me), emailToIdMap.get(audience)));
-        lll.addAll(cr.findByfromIdAndtoId(emailToIdMap.get(audience), emailToIdMap.get(me)));
-
-        for (ChatMessage cm : lll)
-            cr.delete(cm);
-
-        return "done";
-    }
-
-    @PostMapping("/newchat")
-    public Map<String, String> startNewChat(@RequestParam(value = "me") String me,
-            @RequestParam(value = "audience") String audience) {
-
-        final String detail = "hello! " + audience;
-
-        final Map<String, String> emailToIdMap = new HashMap<>(
-                Map.of(me, ur.findByEmail(me).get(0).getId(),
-                        audience, ur.findByEmail(audience).get(0).getId()));
-
-        final String chatid = UUID.randomUUID() + "";
-
-        final ChatMessage insertedEntity = cr
-                .save(new ChatMessage(chatid, emailToIdMap.get(me), emailToIdMap.get(audience), detail,
-                        null, false));
-        final User u = ur.findByEmail(audience).get(0);
-
-        ZoneId seoulZone = ZoneId.of("Asia/Seoul");
-        LocalDateTime seoulTime = LocalDateTime.now(seoulZone);
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        String formattedSeoulTime = seoulTime.format(formatter);
-
-        try {
-            fs.sendNotification(new NotificationRequest(u.getFcmtoken(), me, detail),
-                    Map.of("notitype", "receive", "chatid", insertedEntity.getId(), "detail",
-                            insertedEntity.getChatDetail(),
-                            "timestamp", formattedSeoulTime));
-        } catch (FirebaseMessagingException e) {
-            e.printStackTrace();
-        }
-        return Map.of("recentMessageId", u.getId(), "text", detail, "fromEmail", audience, "unreadmsgcount", "0",
-                "timeStamp", formattedSeoulTime, "profileImagePath",
-                "http://52.78.99.139:8080/rest/get-profile/" + audience);
+            @RequestParam(value = "chatroomid") String chatroomid) {
+        int result = chatroomuserRepository.updateChatroomuserStateToFalse(chatroomid, me);
+        return result + "";
     }
 }

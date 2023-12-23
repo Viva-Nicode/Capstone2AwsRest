@@ -13,6 +13,7 @@ import javax.imageio.ImageIO;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,8 @@ import lombok.Setter;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+
+// 
 // request body 확인용 코드
 /*
 	String bodyJson = "";
@@ -84,22 +87,17 @@ public class RestApiTestController {
 
 	private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
-	@GetMapping("/echo")
-	public String moveSignupPage() {
-		return "hello world";
-	}
-
 	@PostMapping("/signin")
 	public Map<String, Object> signin(@RequestBody SignupRequestData req) {
-		List<User> l = ur.findByEmail(req.getEmail());
+		Optional<User> user = ur.findById(req.getEmail());
 
-		if (l.isEmpty()) {
+		if (!user.isPresent()) {
 			return Map.of("requestResult", "Non-existent email.", "code", 1);
-		} else if (!pe.matches(req.getPassword(), l.get(0).getPassword())) {
+		} else if (!pe.matches(req.getPassword(), user.get().getPassword())) {
 			return Map.of("requestResult", "Password mismatch.", "code", 2);
 		} else {
-			if (!(l.get(0).getFcmtoken().equals(req.getFcmtoken()))) {
-				ur.updateFcmbyEmail(l.get(0).getEmail(), req.getFcmtoken());
+			if (!(user.get().getFcmtoken().equals(req.getFcmtoken()))) {
+				ur.updateFcmbyEmail(user.get().getEmail(), req.getFcmtoken());
 			}
 			return Map.of("requestResult", "sign in success.", "code", 0);
 		}
@@ -108,8 +106,8 @@ public class RestApiTestController {
 	@PostMapping("/signup")
 	@ResponseBody
 	public Map<String, Object> signup(@RequestBody SignupRequestData req) {
-		if (ur.findByEmail(req.getEmail()).isEmpty()) {
-			ur.save(new User(UUID.randomUUID() + "", req.getEmail(), pe.encode(req.getPassword()), null, null,
+		if (!(ur.findById(req.getEmail()).isPresent())) {
+			ur.save(new User(req.getEmail(), pe.encode(req.getPassword()), null, null,
 					req.getFcmtoken()));
 			return Map.of("requestResult", "signup success", "code", 0);
 		} else
@@ -118,10 +116,10 @@ public class RestApiTestController {
 
 	@GetMapping(value = "/get-profile/{email}")
 	public byte[] getRequestProfile(@PathVariable("email") String email) {
-		final User u = ur.findByEmail(email).get(0);
-		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image_path();
+		final User u = ur.findById(email).get();
+		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
 
-		if (u.getProfile_image_path() == null)
+		if (u.getProfile_image() == null)
 			return null;
 
 		File file = new File(path);
@@ -156,7 +154,7 @@ public class RestApiTestController {
 		final String ext = profileImage.getContentType().split("/")[1];
 		final String profileImageName = UUID.randomUUID() + "." + ext;
 		File dest = new File("/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + profileImageName);
-
+		
 		try {
 			BufferedInputStream bis = new BufferedInputStream(profileImage.getInputStream());
 			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
@@ -170,11 +168,8 @@ public class RestApiTestController {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		int c = ur.updateUserprofile(profileImageName, email);
-		log.info("update result code : " + c);
-
-		String result = "ine";
-		return result;
+		ur.updateUserprofile(profileImageName, email);
+		return "lilpa 700";
 	}
 
 	@RequestMapping(value = "/predict", method = { RequestMethod.GET, RequestMethod.POST })
