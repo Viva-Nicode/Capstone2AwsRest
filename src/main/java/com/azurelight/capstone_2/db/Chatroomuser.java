@@ -1,7 +1,5 @@
 package com.azurelight.capstone_2.db;
 
-import java.util.Date;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

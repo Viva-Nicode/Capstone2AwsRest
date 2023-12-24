@@ -1,7 +1,7 @@
 package com.azurelight.capstone_2.db;
 
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,6 +30,7 @@ import java.util.Date;
 @Table(name = "chatmessage")
 @AllArgsConstructor
 @DynamicInsert
+@DynamicUpdate
 @NoArgsConstructor
 public class ChatMessage implements Comparable<ChatMessage> {
     @Id
@@ -57,4 +58,12 @@ public class ChatMessage implements Comparable<ChatMessage> {
         String s = this.timestamp + "";
         return s.substring(0, s.length() - 2);
     }
+
+    public ChatMessage(String chatid, String identifier, String detail, int unreadcount) {
+        this.chatid = chatid;
+        this.identifier = identifier;
+        this.detail = detail;
+        this.unreadcount = unreadcount;
+    }
+
 }

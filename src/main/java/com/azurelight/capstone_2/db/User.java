@@ -2,7 +2,8 @@ package com.azurelight.capstone_2.db;
 
 import java.util.Date;
 
-import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,6 +31,8 @@ import lombok.Setter;
 @Table(name = "user")
 @AllArgsConstructor
 @NoArgsConstructor
+@DynamicInsert
+@DynamicUpdate
 public class User {
 
     @Id
@@ -47,4 +50,11 @@ public class User {
 
     @Column(name = "fcmtoken")
     private String fcmtoken;
+
+    public User(String email, String password, String profile_image, String fcmtoken) {
+        this.email = email;
+        this.password = password;
+        this.profile_image = profile_image;
+        this.fcmtoken = fcmtoken;
+    }
 }

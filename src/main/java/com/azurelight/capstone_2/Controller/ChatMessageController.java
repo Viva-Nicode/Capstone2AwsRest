@@ -2,26 +2,18 @@ package com.azurelight.capstone_2.Controller;
 
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.Date;
 import static java.util.stream.Collectors.toCollection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.threeten.bp.LocalDateTime;
-import org.threeten.bp.ZoneId;
-import org.threeten.bp.format.DateTimeFormatter;
 
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.Optional;
 import java.util.HashMap;
-import java.util.Comparator;
 import java.util.Set;
 import java.util.HashSet;
 
@@ -38,15 +30,11 @@ import com.azurelight.capstone_2.db.Chatroomuser;
 import com.azurelight.capstone_2.db.User;
 import com.google.firebase.messaging.FirebaseMessagingException;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
 import java.util.Collections;
 
 @RestController
 @RequestMapping("/chat")
 public class ChatMessageController {
-    private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
     @Autowired
     private UserRepository userRepository;
@@ -70,7 +58,7 @@ public class ChatMessageController {
         final String chatid = UUID.randomUUID() + "";
 
         String identifier = chatroomuserRepository.findIdentifierByRoomidAndEmail(chatroomid, me).get(0);
-        chatMessageRepository.save(new ChatMessage(chatid, identifier, detail, null, 0));
+        chatMessageRepository.save(new ChatMessage(chatid, identifier, detail, 0));
         String currentTime = Utility.getCurrentDateTimeAsString();
 
         List<Chatroomuser> userlistinroomAll = chatroomuserRepository.findByRoomid(chatroomid);
@@ -80,7 +68,7 @@ public class ChatMessageController {
         String audienceList = String.join(" ", userlistinroomAll.stream().map(Chatroomuser::getEmail).toList());
         System.out.println(audienceList);
 
-        List<NotificationRequest> notificationRequestList = new ArrayList<>(); //이게 비어있음
+        List<NotificationRequest> notificationRequestList = new ArrayList<>(); // 이게 비어있음
 
         for (Chatroomuser u : userlistinroom) {
             if (!u.getEmail().equals(me)) {
@@ -102,14 +90,6 @@ public class ChatMessageController {
         }
         chatroomRepository.updateRecentInfo(chatroomid, detail);
 
-        // try {
-        // fs.sendNotification(new NotificationRequest(u.getFcmtoken(), me, detail),
-        // Map.of("notitype", "receive", "chatid", insertedEntity.getId(), "detail",
-        // insertedEntity.getChatDetail(),
-        // "timestamp", formattedSeoulTime));
-        // } catch (FirebaseMessagingException e) {
-        // e.printStackTrace();
-        // }
         return Map.of("chatId", chatid, "writer", me, "text", detail, "timestamp", currentTime);
     }
 
@@ -304,7 +284,7 @@ public class ChatMessageController {
         if (isFindWeAreAlone) {
             // 새로운 톡방 개설
             final String roomid = UUID.randomUUID() + "";
-            chatroomRepository.save(new Chatroom(roomid, 2, "", null));
+            chatroomRepository.save(new Chatroom(roomid, 2, ""));
             chatroomuserRepository.save(new Chatroomuser(UUID.randomUUID() + "", roomid, me, me, true));
             chatroomuserRepository.save(new Chatroomuser(UUID.randomUUID() + "", roomid, audience, audience, true));
             return Map.of("chatroomid", roomid,

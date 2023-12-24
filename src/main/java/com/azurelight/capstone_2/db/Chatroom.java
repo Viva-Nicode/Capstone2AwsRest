@@ -2,7 +2,8 @@ package com.azurelight.capstone_2.db;
 
 import java.util.Date;
 
-import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,6 +30,8 @@ import lombok.Setter;
 @Table(name = "chatroom")
 @AllArgsConstructor
 @NoArgsConstructor
+@DynamicInsert
+@DynamicUpdate
 public class Chatroom {
 
     @Id
@@ -47,5 +50,11 @@ public class Chatroom {
     public String getRecentTimestamAsString() {
         String s = this.recent_timestamp + "";
         return s.substring(0, s.length() - 2);
+    }
+
+    public Chatroom(String roomid, int usercount, String recent_detail) {
+        this.roomid = roomid;
+        this.usercount = usercount;
+        this.recent_detail = recent_detail;
     }
 }

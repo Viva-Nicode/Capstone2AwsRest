@@ -11,7 +11,6 @@ import java.util.UUID;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -38,7 +37,6 @@ import lombok.Setter;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-
 
 // 
 // request body 확인용 코드
@@ -107,7 +105,7 @@ public class RestApiTestController {
 	@ResponseBody
 	public Map<String, Object> signup(@RequestBody SignupRequestData req) {
 		if (!(ur.findById(req.getEmail()).isPresent())) {
-			ur.save(new User(req.getEmail(), pe.encode(req.getPassword()), null, null,
+			ur.save(new User(req.getEmail(), pe.encode(req.getPassword()), null,
 					req.getFcmtoken()));
 			return Map.of("requestResult", "signup success", "code", 0);
 		} else
@@ -154,7 +152,7 @@ public class RestApiTestController {
 		final String ext = profileImage.getContentType().split("/")[1];
 		final String profileImageName = UUID.randomUUID() + "." + ext;
 		File dest = new File("/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + profileImageName);
-		
+
 		try {
 			BufferedInputStream bis = new BufferedInputStream(profileImage.getInputStream());
 			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
