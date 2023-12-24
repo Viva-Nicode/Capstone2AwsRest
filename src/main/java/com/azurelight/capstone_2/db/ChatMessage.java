@@ -42,7 +42,6 @@ public class ChatMessage implements Comparable<ChatMessage> {
     @Column(name = "detail")
     private String detail;
 
-    @CreationTimestamp
     @Column(name = "timestamp")
     private Date timestamp;
 

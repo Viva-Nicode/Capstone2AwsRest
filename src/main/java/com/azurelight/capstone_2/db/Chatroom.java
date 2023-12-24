@@ -42,7 +42,6 @@ public class Chatroom {
     private String recent_detail;
 
     @Column(name = "recent_timestamp")
-    @CreationTimestamp
     private Date recent_timestamp;
 
     public String getRecentTimestamAsString() {

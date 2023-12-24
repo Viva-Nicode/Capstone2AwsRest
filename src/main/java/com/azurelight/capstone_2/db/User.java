@@ -40,7 +40,6 @@ public class User {
     private String password;
 
     @Column(name = "joindate")
-    @CreationTimestamp
     private Date joindate;
 
     @Column(name = "profile_image")
