@@ -26,6 +26,9 @@ public interface ChatroomuserRepository extends JpaRepository<Chatroomuser, Stri
     @Query(value = "select roomid from chatroomuser cru where cru.email = :email and cru.state = true", nativeQuery = true)
     List<String> findRoomidByEmail(@Param("email") String email);
 
+    @Query(value = "select * from chatroomuser cru where cru.email = :email and cru.state = true", nativeQuery = true)
+    List<Chatroomuser> findByEmailOnlyTrue(@Param("email") String email);
+
     @Query(value = "select * from chatroomuser cru where cru.roomid = :roomid", nativeQuery = true)
     List<Chatroomuser> findByRoomid(@Param("roomid") String roomid);
 

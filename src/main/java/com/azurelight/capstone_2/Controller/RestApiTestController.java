@@ -8,12 +8,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.UUID;
 
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
-
 import java.util.Map;
 import java.util.Optional;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +27,16 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.azurelight.capstone_2.Repository.FriendRepository;
 import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.Service.ClassificationService;
+import com.azurelight.capstone_2.Service.FCMService;
+import com.azurelight.capstone_2.Service.UserDataInitializer;
+import com.azurelight.capstone_2.Service.Utility;
+import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
+import com.azurelight.capstone_2.db.Friend;
 import com.azurelight.capstone_2.db.User;
+import com.google.firebase.messaging.FirebaseMessagingException;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.AllArgsConstructor;
@@ -38,7 +46,7 @@ import lombok.Setter;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-// 
+// /home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/
 // request body 확인용 코드
 /*
 	String bodyJson = "";
@@ -78,26 +86,44 @@ class SignupRequestData {
 @RequestMapping("/rest")
 public class RestApiTestController {
 	@Autowired
+	private FCMService fs;
+	@Autowired
 	private UserRepository ur;
-
 	@Autowired
 	private PasswordEncoder pe;
+	@Autowired
+	private UserRepository userRepository;
+	@Autowired
+	private FriendRepository friendRepository;
+	@Autowired
+	private UserDataInitializer userdataInitializer;
 
 	private final Logger log = LoggerFactory.getLogger(this.getClass().getSimpleName());
 
+	@GetMapping("fetch-userdata")
+	public Map<String, Object> fetchUserData(@RequestParam(value = "email") String email) {
+		// UserDataInitializer userdataInitializer = new UserDataInitializer(email);
+		userdataInitializer.setTargetUserEmail(email);
+		return Map.of("friendlist", userdataInitializer.userFriendsFetcher(),
+				"messagelist", userdataInitializer.userMessagesFetcher(),
+				"friendRequestNotificationlist", userdataInitializer.userFriendRequestNotificationFetcher());
+	}
+
 	@PostMapping("/signin")
-	public Map<String, Object> signin(@RequestBody SignupRequestData req) {
-		Optional<User> user = ur.findById(req.getEmail());
+	public Map<String, Object> signin(@RequestParam(value = "email") String email,
+			@RequestParam(value = "password") String password, @RequestParam(value = "fcmtoken") String fcmtoken) {
+
+		Optional<User> user = ur.findById(email);
 
 		if (!user.isPresent()) {
-			return Map.of("requestResult", "Non-existent email.", "code", 1);
-		} else if (!pe.matches(req.getPassword(), user.get().getPassword())) {
-			return Map.of("requestResult", "Password mismatch.", "code", 2);
+			return Map.of("code", 1);
+		} else if (!pe.matches(password, user.get().getPassword())) {
+			return Map.of("code", 2);
 		} else {
-			if (!(user.get().getFcmtoken().equals(req.getFcmtoken()))) {
-				ur.updateFcmbyEmail(user.get().getEmail(), req.getFcmtoken());
-			}
-			return Map.of("requestResult", "sign in success.", "code", 0);
+			User me = user.get();
+			if (!(me.getFcmtoken().equals(fcmtoken)))
+				ur.updateFcmbyEmail(me.getEmail(), fcmtoken);
+			return Map.of("code", 0);
 		}
 	}
 
@@ -114,6 +140,7 @@ public class RestApiTestController {
 
 	@GetMapping(value = "/get-profile/{email}")
 	public byte[] getRequestProfile(@PathVariable("email") String email) {
+		System.out.println("in get profile : " + email);
 		final User u = ur.findById(email).get();
 		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
 
@@ -146,6 +173,76 @@ public class RestApiTestController {
 		return byteImage;
 	}
 
+	@GetMapping("/get-newuser")
+	public Map<String, String> getNewFriendSearchResult(@RequestParam(value = "me") String me,
+			@RequestParam(value = "keyword") String keyword) {
+
+		Set<String> allusers = new HashSet<>(userRepository.findAll().stream().map(User::getEmail).toList());
+		allusers.remove(me);
+
+		Set<String> friends = new HashSet<>(
+				friendRepository.findByUserEmail(me).stream()
+						.filter(f -> !(friendRepository.findByTwoUser(f.getFriendemail(), me).isEmpty()))
+						.map(Friend::getFriendemail).toList());
+
+		allusers.removeAll(friends);
+
+		Iterator<String> it = allusers.iterator();
+		while (it.hasNext()) {
+			String n = it.next();
+			if (n.contains(keyword)) {
+				if (!friendRepository.findByTwoUser(me, n).isEmpty()) {
+					return Map.of("result", n, "requestState", "wait");
+				} else if (!friendRepository.findByTwoUser(n, me).isEmpty()) {
+					return Map.of("result", n, "requestState", "accept");
+				} else {
+					return Map.of("result", n, "requestState", "init");
+				}
+			}
+		}
+		return Map.of("result", "none");
+	}
+
+	@PostMapping("/add-friend-acc")
+	public Map<String, Object> doAcceptAddFriend(@RequestParam(value = "me") String me,
+			@RequestParam(value = "audience") String audience) {
+
+		String fcmtoken = userRepository.findById(audience).get().getFcmtoken();
+		friendRepository.save(new Friend(UUID.randomUUID() + "", me, audience, "$none$"));
+
+		try {
+			fs.sendNotification(new NotificationRequest(fcmtoken, "친추 수락함", me + " <- 얘가"),
+					Map.of("notitype", "friendAddReplyNoti", "fromemail", me));
+		} catch (FirebaseMessagingException e) {
+			e.printStackTrace();
+		}
+
+		return Map.of("result", "success");
+	}
+
+	@PostMapping("/add-friend-refuse")
+	public Map<String, Object> doRefuseAddFriend(@RequestParam(value = "me") String me,
+			@RequestParam(value = "audience") String audience) {
+		friendRepository.deleteByTwoUser(audience, me);
+		return Map.of("result", "success");
+	}
+
+	@PostMapping("/add-friend-req")
+	public Map<String, Object> doRequestAddFriend(@RequestParam(value = "me") String me,
+			@RequestParam(value = "audience") String audience) {
+		String fcmtoken = userRepository.findById(audience).get().getFcmtoken();
+		friendRepository.save(new Friend(UUID.randomUUID() + "", me, audience, "$none$"));
+
+		try {
+			fs.sendNotification(new NotificationRequest(fcmtoken, "친추옴", me + " <- 얘한테"),
+					Map.of("notitype", "friendAddNoti", "fromemail", me, "timestamp",
+							Utility.getCurrentDateTimeAsString()));
+		} catch (FirebaseMessagingException e) {
+			e.printStackTrace();
+		}
+		return Map.of("result", "success");
+	}
+
 	@PostMapping("/store-profile")
 	public String uploadProfile(@RequestParam(value = "image") MultipartFile profileImage,
 			@RequestParam(value = "email") String email) {
@@ -174,7 +271,7 @@ public class RestApiTestController {
 	public String PredictionRequest(@RequestParam(value = "image") MultipartFile pins) {
 		final String ext = pins.getContentType().split("/")[1];
 		final String uuidPinName = UUID.randomUUID() + "." + ext;
-		File dest = new File("/home/ubuntu/Capstone2AwsRest/src/main/resources/predictedImages/" + uuidPinName);
+		File dest = new File("/Users/nicode./Capstone2AwsRest/src/main/resources/predictedImages/" + uuidPinName);
 
 		try {
 			BufferedInputStream bis = new BufferedInputStream(pins.getInputStream());
@@ -191,7 +288,7 @@ public class RestApiTestController {
 
 		ClassificationService cs = new ClassificationService();
 		String rr = cs
-				.doClassification("/home/ubuntu/Capstone2AwsRest/src/main/resources/predictedImages/" + uuidPinName);
+				.doClassification("/Users/nicode./Capstone2AwsRest/src/main/resources/predictedImages/" + uuidPinName);
 		log.error("============================================");
 		log.error(rr);
 		log.error("============================================");
