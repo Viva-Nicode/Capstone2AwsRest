@@ -1,26 +1,16 @@
 package com.azurelight.capstone_2.Controller;
 
-import java.util.Date;
 import java.util.Arrays;
 import java.util.UUID;
-import static java.util.stream.Collectors.toCollection;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import java.io.InputStream;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Set;
-import java.util.HashSet;
 
 import com.azurelight.capstone_2.Repository.ChatMessageRepository;
 import com.azurelight.capstone_2.Repository.ChatroomRepository;
@@ -34,13 +24,7 @@ import com.azurelight.capstone_2.db.ChatMessage;
 import com.azurelight.capstone_2.db.Chatroom;
 import com.azurelight.capstone_2.db.Chatroomuser;
 import com.azurelight.capstone_2.db.SystemMessage;
-import com.azurelight.capstone_2.db.User;
 import com.google.firebase.messaging.FirebaseMessagingException;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.transaction.Transactional;
-
-import java.util.Collections;
 
 @RestController
 @RequestMapping("/chat")
@@ -68,8 +52,6 @@ public class ChatMessageController {
     public Map<String, Object> sendMessage(@RequestParam(value = "chatroomid") String chatroomid,
             @RequestParam(value = "me") String me, @RequestParam(value = "detail") String detail) {
 
-        // if (chatroomuserRepository.findByRoomidOnlyTrue(chatroomid).size() == 1) {}
-
         final String chatid = UUID.randomUUID() + "";
 
         String identifier = chatroomuserRepository.findIdentifierByRoomidAndEmail(chatroomid, me).get(0);
@@ -89,7 +71,7 @@ public class ChatMessageController {
                 notificationRequestList.add(new NotificationRequest(fcmtoken, me, detail));
             }
         }
-        // audiencelist는 state를 고려하지 않음
+
         if (!notificationRequestList.isEmpty()) {
             try {
                 fs.sendNotificationAll(notificationRequestList,
@@ -106,17 +88,17 @@ public class ChatMessageController {
         }
 
         chatroomRepository.updateRecentInfo(chatroomid, detail);
-
-        return Map.of("chatid", chatid, "writer", me, "text", detail, "timestamp", currentTime, "readusers", me);
+        return Map.of("chatid", chatid, "writer", me, "detail", detail, "timestamp", currentTime, "readusers", me);
     }
 
     @PostMapping("/readmsg")
     public int readMessage(@RequestParam(value = "chatroomid") String roomid, @RequestParam(value = "me") String me,
             @RequestParam(value = "chatidlist") String chatid) {
         System.out.println(me + "가 읽음");
-        // 어떤놈이 보내놓고 나가서 아무도 없는데 한놈이 와서 읽으면 에러
+
         List<String> chatidlist = Arrays.asList(chatid.split(" "));
         List<String> updatedChatid = new ArrayList<>();
+
         for (String id : chatidlist) {
             ChatMessage cm = chatMessageRepository.findById(id).get();
             List<String> readuserlist = new ArrayList<>(Arrays.asList(cm.getReadusers().split(" ")));
@@ -138,7 +120,7 @@ public class ChatMessageController {
 
         if (!(notificationRequestList.isEmpty())) {
             try {
-                fs.sendSilentNotificationAll(notificationRequestList,
+                fs.sendNotificationAll(notificationRequestList,
                         Map.of("notitype", "reply",
                                 "chatroomid", roomid,
                                 "who", me,
@@ -148,82 +130,6 @@ public class ChatMessageController {
             }
         }
         return 0;
-    }
-
-    @GetMapping("/get-recentmsg")
-    public List<HashMap<String, Object>> getRecentMessages(@RequestParam(value = "me") String me) {
-
-        List<HashMap<String, Object>> result = new ArrayList<HashMap<String, Object>>();
-
-        // 본인이 소속된 톡방의 룸아이디 목록을 state를 고려하여 가져온다.
-        List<String> roomids = chatroomuserRepository.findRoomidByEmail(me);
-
-        for (String roomid : roomids) {
-            // 룸아이디로 톡방 정보를 가져온다.
-            Chatroom chatroom = chatroomRepository.findById(roomid).get();
-
-            // 해당 톡방에 소속된 유저들의 목록을 가져온다. state는 고려하지 않는다.
-            List<Chatroomuser> affiliatedUsersInChatroom = chatroomuserRepository.findByRoomid(roomid);
-
-            List<String> audienceList = affiliatedUsersInChatroom.stream().filter(u -> !u.getEmail().equals(me))
-                    .map(Chatroomuser::getEmail).toList();
-
-            result.add(new HashMap<String, Object>(Map.of(
-                    "timestamp", chatroom.getRecentTimestamAsString(),
-                    "text", chatroom.getRecent_detail(),
-                    "chatroomid", chatroom.getRoomid(),
-                    "audienceList", audienceList)));
-        }
-        return result;
-    }
-
-    @GetMapping("/get-chatlogs")
-    public Map<String, Object> getChatlogs(@RequestParam(value = "chatroomid") String roomid) {
-
-        List<Chatroomuser> userListInRoom = chatroomuserRepository.findByRoomid(roomid);
-        Map<String, String> identifierToEmailMap = new HashMap<>();
-        List<ChatMessage> messageList = new ArrayList<>();
-        List<HashMap<String, Object>> chatloglist = new ArrayList<HashMap<String, Object>>();
-
-        for (Chatroomuser cru : userListInRoom) {
-            messageList.addAll(chatMessageRepository.findByIdentifier(cru.getIdentifier()));
-            identifierToEmailMap.put(cru.getIdentifier(), cru.getEmail());
-        }
-
-        Collections.sort(messageList);
-        Collections.reverse(messageList);
-
-        for (ChatMessage cm : messageList) {
-            chatloglist.add(new HashMap<String, Object>(Map.of(
-                    "chatId", cm.getChatid(),
-                    "writer", identifierToEmailMap.get(cm.getIdentifier()),
-                    "text", cm.getDetail(),
-                    "timestamp", cm.getRecentTimestamAsString())));
-        }
-
-        List<Chatroomuser> joinedUserList = chatroomuserRepository.findByRoomid(roomid);
-        List<HashMap<String, String>> joinedusermap = new ArrayList<HashMap<String, String>>();
-
-        for (Chatroomuser u : joinedUserList) {
-            joinedusermap.add(new HashMap<String, String>(Map.of(
-                    "email", u.getEmail(), "nickname", u.getNickname())));
-        }
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("chatloglist", chatloglist);
-        response.put("joineduserlist", joinedusermap);
-
-        // dmswns0147@gmail.com^2023-05-15 13:33:04#
-
-        // try {
-        // fs.sendNotification(new NotificationRequest(opne.getFcmtoken(), "hi~!!", "i
-        // am fxxking bug!"),
-        // Map.of("notitype", "reply", "chatid", "allMessage"));
-        // } catch (FirebaseMessagingException e) {
-        // e.printStackTrace();
-        // }
-
-        return response;
     }
 
     @PostMapping("/newchat")
@@ -278,14 +184,68 @@ public class ChatMessageController {
                 fs.sendNotificationAll(notificationRequestList,
                         Map.of("notitype", "syslog",
                                 "sysid", sysid,
-                                "type", "exit",
+                                "type", "EXIT",
                                 "roomid", chatroomid,
                                 "timestamp", Utility.getCurrentDateTimeAsString(),
-                                "who", me));
+                                "detail", me));
             } catch (FirebaseMessagingException e) {
                 e.printStackTrace();
             }
         }
         return result + "";
+    }
+
+    @PostMapping("enter-chat")
+    public Map<String, String> enterChattingRoom(@RequestParam(value = "me") String me,
+            @RequestParam(value = "target") String target,
+            @RequestParam(value = "chatroomid") String chatroomid) {
+
+        List<Chatroomuser> cru = chatroomuserRepository.findByRoomid(chatroomid);
+        Boolean isExistAlready = true;
+        String chatuserIdentifier = "";
+        final String sysid = UUID.randomUUID() + "";
+
+        for (Chatroomuser user : cru) {
+            if (user.getEmail().equals(target) && !user.isState()) {
+                isExistAlready = false;
+                chatuserIdentifier = user.getIdentifier();
+                chatroomuserRepository.updateChatroomuserState(chatroomid, target);
+                break;
+            }
+        }
+
+        if (isExistAlready) {
+            chatuserIdentifier = UUID.randomUUID() + "";
+            chatroomuserRepository.save(new Chatroomuser(chatuserIdentifier, chatroomid, target, target, true));
+        }
+
+        systemMessageRepository
+                .save(new SystemMessage(sysid, chatroomid, me + " " + target, chatuserIdentifier, "ENTER"));
+
+        List<NotificationRequest> notificationRequestList = new ArrayList<>();
+
+        for (Chatroomuser user : cru.stream().filter(u -> u.isState()).filter(u -> !u.getEmail().equals(me)).toList()) {
+            notificationRequestList.add(new NotificationRequest(
+                    userRepository.findById(user.getEmail()).get().getFcmtoken(), "system log", "ENTER"));
+        }
+
+        if (!(notificationRequestList.isEmpty())) {
+            try {
+                fs.sendNotificationAll(notificationRequestList,
+                        Map.of("notitype", "syslog",
+                                "sysid", sysid,
+                                "type", "ENTER",
+                                "roomid", chatroomid,
+                                "timestamp", Utility.getCurrentDateTimeAsString(),
+                                "detail", me + " " + target));
+            } catch (FirebaseMessagingException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return Map.of("sysid", sysid,
+                "type", "ENTER",
+                "timestamp", Utility.getCurrentDateTimeAsString(),
+                "detail", me + " " + target);
     }
 }

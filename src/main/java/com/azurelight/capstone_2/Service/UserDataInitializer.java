@@ -8,9 +8,11 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Date;
 import com.azurelight.capstone_2.Repository.ChatMessageRepository;
+import com.azurelight.capstone_2.Repository.ChatroomRepository;
 import com.azurelight.capstone_2.Repository.ChatroomuserRepository;
 import com.azurelight.capstone_2.Repository.FriendRepository;
 import com.azurelight.capstone_2.Repository.SystemMessageRepository;
+import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.db.ChatMessage;
 import com.azurelight.capstone_2.db.Chatroomuser;
 import com.azurelight.capstone_2.db.Friend;
@@ -22,7 +24,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.Collections;
-import java.util.Arrays;
 
 import java.util.HashMap;
 
@@ -32,12 +33,6 @@ import java.util.HashMap;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserDataInitializer {
-
-    private String targetUserEmail;
-
-    public UserDataInitializer(String u) {
-        this.targetUserEmail = u;
-    }
 
     @Autowired
     private FriendRepository friendRepository;
@@ -51,7 +46,16 @@ public class UserDataInitializer {
     @Autowired
     private SystemMessageRepository systemMessageRepository;
 
-    public List<HashMap<String, String>> userFriendsFetcher() {
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private FCMService fs;
+
+    @Autowired
+    private ChatroomRepository chatroomRepository;
+
+    public List<HashMap<String, String>> userFriendsFetcher(final String targetUserEmail) {
         List<HashMap<String, String>> fetchResult = new ArrayList<HashMap<String, String>>();
         List<Friend> friendslist = friendRepository.findByUserEmail(targetUserEmail);
 
@@ -62,23 +66,27 @@ public class UserDataInitializer {
                                 "group", f.getFriendgroup())));
             }
         }
+        UserCurrentView.getInstance().put(targetUserEmail, CurrentUserView.HOME);
         return fetchResult;
     }
 
-    public List<HashMap<String, String>> userFriendRequestNotificationFetcher() {
+    public List<HashMap<String, String>> userFriendRequestNotificationFetcher(final String targetUserEmail) {
+
         List<Friend> l = friendRepository.findByFriendemail(targetUserEmail);
         List<HashMap<String, String>> fetchResult = new ArrayList<HashMap<String, String>>();
         for (Friend f : l) {
             if (friendRepository.findByTwoUser(targetUserEmail, f.getUseremail()).isEmpty()) {
                 fetchResult.add(new HashMap<String, String>(Map.of(
+                        "notitype", "friendRequest",
                         "fromemail", f.getUseremail(),
                         "timestamp", f.getRecentTimestamAsString())));
             }
         }
+        UserCurrentView.getInstance().put(targetUserEmail, CurrentUserView.NOTIFICATION_CENTER);
         return fetchResult;
     }
 
-    public List<HashMap<String, Object>> userMessagesFetcher() {
+    public List<HashMap<String, Object>> userMessagesFetcher(final String targetUserEmail) {
         List<HashMap<String, Object>> fetchResult = new ArrayList<HashMap<String, Object>>();
         List<Chatroomuser> chatroomuserlist = chatroomuserRepository.findByEmailOnlyTrue(targetUserEmail);
         Map<String, String> identifierToEmailConvertingTable = new HashMap<>();
@@ -87,7 +95,6 @@ public class UserDataInitializer {
             HashMap<String, Object> messageInfoMap = new HashMap<>();
             messageInfoMap.put("chatroomid", chatroomuser.getRoomid());
             // 원래 가장 최근 메시지 내용인 text와 시간인 timestamp가 있었는데 이건 걍 클라쪽에서 정한다.
-            // unreadcount가 추가된다.
 
             List<SystemMessage> usersystemMessageOnlyEnter = systemMessageRepository
                     .findByIdentifierOnlyEnter(chatroomuser.getIdentifier());
@@ -98,17 +105,15 @@ public class UserDataInitializer {
             // userlistInRoom :
             // 채팅방 내 모든 유저들(state고려x)의 identifier를 반복하며 메시지들을 가져와 allUserMessageList에 add한다.
             List<ChatMessage> allUserMessageList = new ArrayList<>();
-            List<Chatroomuser> userlistInRoom = chatroomuserRepository.findByRoomidOnlyTrue(chatroomuser.getRoomid());
+            List<Chatroomuser> userlistInRoom = chatroomuserRepository.findByRoomid(chatroomuser.getRoomid());
 
             for (Chatroomuser cru : userlistInRoom) {
                 allUserMessageList.addAll(chatMessageRepository.findByIdentifier(cru.getIdentifier()));
                 identifierToEmailConvertingTable.put(cru.getIdentifier(), cru.getEmail());
             }
 
-            // audiencelist는 본인포함, state고려 안함
             messageInfoMap.put("audiencelist",
-                    String.join(" ", userlistInRoom.stream().map(Chatroomuser::getEmail).toList()));
-            
+                    String.join(" ", userlistInRoom.stream().filter(u -> u.isState()).map(Chatroomuser::getEmail).toList()));
 
             List<SystemMessage> allSystemMessageInroom = systemMessageRepository.findByRoomid(chatroomuser.getRoomid());
 
@@ -134,24 +139,20 @@ public class UserDataInitializer {
                 }
                 allSystemMessageInroom = temp2;
             }
-            int unreadcount = 0;
+
             messageInfoMap.put("logs", new ArrayList<HashMap<String, Object>>());
             messageInfoMap.put("syslogs", new ArrayList<HashMap<String, Object>>());
 
             for (ChatMessage cm : allUserMessageList) {
-                List<String> l = Arrays.asList(cm.getReadusers().split(" "));
-                if (!l.contains(targetUserEmail))
-                    unreadcount++;
 
                 ((ArrayList<HashMap<String, Object>>) messageInfoMap.get("logs"))
                         .add(new HashMap<String, Object>(Map.of(
                                 "chatid", cm.getChatid(),
                                 "writer", identifierToEmailConvertingTable.get(cm.getIdentifier()),
-                                "text", cm.getDetail(),
+                                "detail", cm.getDetail(),
                                 "timestamp", cm.getRecentTimestamAsString(),
                                 "readusers", cm.getReadusers())));
             }
-            messageInfoMap.put("unreadcount", unreadcount);
 
             for (SystemMessage sm : allSystemMessageInroom) {
                 ((ArrayList<HashMap<String, Object>>) messageInfoMap.get("syslogs"))
