@@ -66,7 +66,6 @@ public class UserDataInitializer {
                                 "group", f.getFriendgroup())));
             }
         }
-        UserCurrentView.getInstance().put(targetUserEmail, CurrentUserView.HOME);
         return fetchResult;
     }
 
@@ -82,7 +81,6 @@ public class UserDataInitializer {
                         "timestamp", f.getRecentTimestamAsString())));
             }
         }
-        UserCurrentView.getInstance().put(targetUserEmail, CurrentUserView.NOTIFICATION_CENTER);
         return fetchResult;
     }
 

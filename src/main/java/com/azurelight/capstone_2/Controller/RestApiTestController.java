@@ -30,7 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.azurelight.capstone_2.Repository.FriendRepository;
 import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.Service.ClassificationService;
-import com.azurelight.capstone_2.Service.CurrentUserView;
+import com.azurelight.capstone_2.Service.AppStateEnum;
 import com.azurelight.capstone_2.Service.FCMService;
 import com.azurelight.capstone_2.Service.UserCurrentView;
 import com.azurelight.capstone_2.Service.UserDataInitializer;
@@ -44,8 +44,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
-import java.util.List;
-import java.util.HashMap;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -106,18 +104,11 @@ public class RestApiTestController {
 
 	@GetMapping("fetch-userdata")
 	public Map<String, Object> fetchUserData(@RequestParam(value = "email") String email) {
-		System.out.println("fetch-userdata");
-		UserCurrentView.getInstance().put(email, CurrentUserView.FOREGROUND);
+		System.out.println(email + " : fetch-userdata");
+		UserCurrentView.getInstance().put(email, AppStateEnum.FOREGROUND);
 		return Map.of("friendlist", userdataInitializer.userFriendsFetcher(email),
 				"messagelist", userdataInitializer.userMessagesFetcher(email),
 				"friendRequestNotificationlist", userdataInitializer.userFriendRequestNotificationFetcher(email));
-	}
-
-	@PostMapping("change-view")
-	public String changeUserCurrentView(@RequestParam(value = "me") String me,
-			@RequestParam("newview") String newview) {
-		UserCurrentView.getInstance().put(me, CurrentUserView.BACKGROUND);
-		return "";
 	}
 
 	@PostMapping("/signin")
@@ -149,30 +140,26 @@ public class RestApiTestController {
 			return Map.of("requestResult", "Your email is duplicated.", "code", 1);
 	}
 
-	@PostMapping("/background")
-	public String userViewChangeBackground(@RequestParam(value = "me") String me) {
-		UserCurrentView.getInstance().put(me, CurrentUserView.BACKGROUND);
-		return "suc";
+	@PostMapping(value = "/changeAppState")	
+	public int changeAppState(@RequestParam(value = "me") String me, @RequestParam(value = "state") String newState){
+		if (newState.equals("background")){
+			UserCurrentView.getInstance().put(me, AppStateEnum.BACKGROUND);
+			System.out.println("changed " + me + " : " + UserCurrentView.getInstance().get(me));
+		}else if (newState.equals("inactive")){
+			UserCurrentView.getInstance().put(me, AppStateEnum.INACTIVE);
+			System.out.println("changed " + me + " : " + UserCurrentView.getInstance().get(me));
+		}else if (newState.equals("terminated")){
+			UserCurrentView.getInstance().put(me, AppStateEnum.TERMINATED);
+			System.out.println("changed " + me + " : " + UserCurrentView.getInstance().get(me));
+		}
+		return 0;
 	}
 
-	@PostMapping("/inactive")
-	public String userViewChangeInactive(@RequestParam(value = "me") String me) {
-		UserCurrentView.getInstance().put(me, CurrentUserView.INACTIVE);
-		return "suc";
-	}
-
-	@GetMapping("/getuserfriends")
-	public List<HashMap<String, String>> getUserFriendsDataRequest(@RequestParam(value = "me") String me){
-		System.out.println("call by " + me );
-		return userdataInitializer.userFriendsFetcher(me);
-	}
-
-	
 	@GetMapping(value = "/get-profile/{email}")
 	public byte[] getRequestProfile(@PathVariable("email") String email) {
 		System.out.println("in get profile : " + email);
 		final User u = ur.findById(email).get();
-		final String path = "/Users/nicode./Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
+		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
 
 		if (u.getProfile_image() == null)
 			return null;

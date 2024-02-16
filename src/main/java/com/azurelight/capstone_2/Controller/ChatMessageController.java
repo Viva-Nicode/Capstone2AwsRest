@@ -17,7 +17,9 @@ import com.azurelight.capstone_2.Repository.ChatroomRepository;
 import com.azurelight.capstone_2.Repository.ChatroomuserRepository;
 import com.azurelight.capstone_2.Repository.SystemMessageRepository;
 import com.azurelight.capstone_2.Repository.UserRepository;
+import com.azurelight.capstone_2.Service.AppStateEnum;
 import com.azurelight.capstone_2.Service.FCMService;
+import com.azurelight.capstone_2.Service.UserCurrentView;
 import com.azurelight.capstone_2.Service.Utility;
 import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
 import com.azurelight.capstone_2.db.ChatMessage;
@@ -63,7 +65,7 @@ public class ChatMessageController {
 
         String audienceList = String.join(" ", userlistinroomAll.stream().map(Chatroomuser::getEmail).toList());
 
-        List<NotificationRequest> notificationRequestList = new ArrayList<>(); // 이게 비어있음
+        List<NotificationRequest> notificationRequestList = new ArrayList<>();
 
         for (Chatroomuser u : userlistinroom) {
             if (!u.getEmail().equals(me)) {
@@ -113,8 +115,15 @@ public class ChatMessageController {
         List<NotificationRequest> notificationRequestList = new ArrayList<>();
         for (Chatroomuser u : userlist) {
             if (!u.getEmail().equals(me)) {
-                String fcmtoken = userRepository.findById(u.getEmail()).get().getFcmtoken();
-                notificationRequestList.add(new NotificationRequest(fcmtoken, "reply", "i am bug."));
+                AppStateEnum s = UserCurrentView.getInstance().get(u.getEmail());
+
+                if (s == AppStateEnum.FOREGROUND) {
+                    System.out.println(u.getEmail() + " state is " + AppStateEnum.FOREGROUND);
+                    String fcmtoken = userRepository.findById(u.getEmail()).get().getFcmtoken();
+                    notificationRequestList.add(new NotificationRequest(fcmtoken, "reply", "i am bug."));
+                } else {
+                    System.out.println(u.getEmail() + " must to send but state is " + s);
+                }
             }
         }
 
@@ -176,20 +185,24 @@ public class ChatMessageController {
             List<NotificationRequest> notificationRequestList = new ArrayList<>();
 
             for (Chatroomuser user : cru) {
-                notificationRequestList.add(new NotificationRequest(
-                        userRepository.findById(user.getEmail()).get().getFcmtoken(), "system log", "EXIT"));
+                AppStateEnum s = UserCurrentView.getInstance().get(user.getEmail());
+                if (s == AppStateEnum.FOREGROUND) {
+                    notificationRequestList.add(new NotificationRequest(
+                            userRepository.findById(user.getEmail()).get().getFcmtoken(), "system log", "EXIT"));
+                }
             }
-
-            try {
-                fs.sendNotificationAll(notificationRequestList,
-                        Map.of("notitype", "syslog",
-                                "sysid", sysid,
-                                "type", "EXIT",
-                                "roomid", chatroomid,
-                                "timestamp", Utility.getCurrentDateTimeAsString(),
-                                "detail", me));
-            } catch (FirebaseMessagingException e) {
-                e.printStackTrace();
+            if (!(notificationRequestList.isEmpty())) {
+                try {
+                    fs.sendNotificationAll(notificationRequestList,
+                            Map.of("notitype", "syslog",
+                                    "sysid", sysid,
+                                    "type", "EXIT",
+                                    "roomid", chatroomid,
+                                    "timestamp", Utility.getCurrentDateTimeAsString(),
+                                    "detail", me));
+                } catch (FirebaseMessagingException e) {
+                    e.printStackTrace();
+                }
             }
         }
         return result + "";
@@ -225,8 +238,11 @@ public class ChatMessageController {
         List<NotificationRequest> notificationRequestList = new ArrayList<>();
 
         for (Chatroomuser user : cru.stream().filter(u -> u.isState()).filter(u -> !u.getEmail().equals(me)).toList()) {
-            notificationRequestList.add(new NotificationRequest(
-                    userRepository.findById(user.getEmail()).get().getFcmtoken(), "system log", "ENTER"));
+            AppStateEnum s = UserCurrentView.getInstance().get(user.getEmail());
+            if (s == AppStateEnum.FOREGROUND) {
+                notificationRequestList.add(new NotificationRequest(
+                        userRepository.findById(user.getEmail()).get().getFcmtoken(), "system log", "ENTER"));
+            }
         }
 
         if (!(notificationRequestList.isEmpty())) {

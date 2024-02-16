@@ -10,12 +10,12 @@ import java.util.HashMap;
 @NoArgsConstructor
 public class UserCurrentView {
 
-    private volatile static Map<String, CurrentUserView> userCrurentViewTable;
+    private volatile static Map<String, AppStateEnum> userCrurentViewTable;
 
-    public static Map<String, CurrentUserView> getInstance() {
+    public static Map<String, AppStateEnum> getInstance() {
         if (userCrurentViewTable == null) {
             synchronized (UserCurrentView.class){
-                userCrurentViewTable = new HashMap<String, CurrentUserView>();
+                userCrurentViewTable = new HashMap<String, AppStateEnum>();
             }
         }
         return userCrurentViewTable;
