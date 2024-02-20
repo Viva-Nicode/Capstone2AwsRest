@@ -157,9 +157,9 @@ public class RestApiTestController {
 
 	@GetMapping(value = "/get-profile/{email}")
 	public byte[] getRequestProfile(@PathVariable("email") String email) {
-		System.out.println("in get profile : " + email);
+
 		final User u = ur.findById(email).get();
-		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
+		final String path = "/Users/nicode./Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
 
 		if (u.getProfile_image() == null)
 			return null;

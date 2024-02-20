@@ -3,11 +3,22 @@ package com.azurelight.capstone_2.Controller;
 import java.util.Arrays;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.List;
+import javax.imageio.ImageIO;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
@@ -15,6 +26,7 @@ import java.util.HashMap;
 import com.azurelight.capstone_2.Repository.ChatMessageRepository;
 import com.azurelight.capstone_2.Repository.ChatroomRepository;
 import com.azurelight.capstone_2.Repository.ChatroomuserRepository;
+import com.azurelight.capstone_2.Repository.ImageMessageRepository;
 import com.azurelight.capstone_2.Repository.SystemMessageRepository;
 import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.Service.AppStateEnum;
@@ -25,6 +37,7 @@ import com.azurelight.capstone_2.Service.Noti.NotificationRequest;
 import com.azurelight.capstone_2.db.ChatMessage;
 import com.azurelight.capstone_2.db.Chatroom;
 import com.azurelight.capstone_2.db.Chatroomuser;
+import com.azurelight.capstone_2.db.ImageMessage;
 import com.azurelight.capstone_2.db.SystemMessage;
 import com.google.firebase.messaging.FirebaseMessagingException;
 
@@ -50,6 +63,9 @@ public class ChatMessageController {
     @Autowired
     private SystemMessageRepository systemMessageRepository;
 
+    @Autowired
+    private ImageMessageRepository imageMessageRepository;
+
     @PostMapping("/send-msg")
     public Map<String, Object> sendMessage(@RequestParam(value = "chatroomid") String chatroomid,
             @RequestParam(value = "me") String me, @RequestParam(value = "detail") String detail) {
@@ -60,10 +76,8 @@ public class ChatMessageController {
         chatMessageRepository.save(new ChatMessage(chatid, identifier, detail, me));
         String currentTime = Utility.getCurrentDateTimeAsString();
 
-        List<Chatroomuser> userlistinroomAll = chatroomuserRepository.findByRoomid(chatroomid);
-        List<Chatroomuser> userlistinroom = userlistinroomAll.stream().filter(u -> u.isState()).toList();
-
-        String audienceList = String.join(" ", userlistinroomAll.stream().map(Chatroomuser::getEmail).toList());
+        List<Chatroomuser> userlistinroom = chatroomuserRepository.findByRoomidOnlyTrue(chatroomid);
+        String audienceList = String.join(" ", userlistinroom.stream().map(Chatroomuser::getEmail).toList());
 
         List<NotificationRequest> notificationRequestList = new ArrayList<>();
 
@@ -91,6 +105,87 @@ public class ChatMessageController {
 
         chatroomRepository.updateRecentInfo(chatroomid, detail);
         return Map.of("chatid", chatid, "writer", me, "detail", detail, "timestamp", currentTime, "readusers", me);
+    }
+
+    @PostMapping("/send-photo")
+    public Map<String, Object> sendPhotoMessage(@RequestParam(value = "chatroomid") String chatroomid,
+            @RequestParam(value = "me") String me, @RequestParam(value = "photo") MultipartFile photo) {
+        final String ext = photo.getContentType().split("/")[1];
+        final String photoIdentifier = UUID.randomUUID() + "";
+        final String photoname = photoIdentifier + "." + ext;
+        String currentTime = "";
+        final String userIdentifier = chatroomuserRepository.findIdentifierByRoomidAndEmail(chatroomid, me).get(0);
+        File dest = new File("/Users/nicode./Capstone2AwsRest/src/main/resources/chatPhotos/" + photoname);
+
+        try {
+            BufferedInputStream bis = new BufferedInputStream(photo.getInputStream());
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
+            int bytesRead = 0;
+            byte[] buffer = new byte[1024];
+            while ((bytesRead = bis.read(buffer, 0, 1024)) != -1)
+                bos.write(buffer, 0, bytesRead);
+            bos.close();
+            bis.close();
+            imageMessageRepository.save(new ImageMessage(photoIdentifier, userIdentifier, me));
+            currentTime = Utility.getCurrentDateTimeAsString();
+
+            List<Chatroomuser> userlistinroom = chatroomuserRepository.findByRoomidOnlyTrue(chatroomid);
+            String audienceList = String.join(" ", userlistinroom.stream().map(Chatroomuser::getEmail).toList());
+
+            List<NotificationRequest> notificationRequestList = new ArrayList<>();
+
+            for (Chatroomuser u : userlistinroom) {
+                if (!u.getEmail().equals(me)) {
+                    String fcmtoken = userRepository.findById(u.getEmail()).get().getFcmtoken();
+                    notificationRequestList.add(new NotificationRequest(fcmtoken, me, "The photo has arrived."));
+                }
+            }
+
+            if (!notificationRequestList.isEmpty()) {
+                fs.sendNotificationAll(notificationRequestList,
+                        Map.of("notitype", "photoReceive",
+                                "roomid", chatroomid,
+                                "chatid", photoIdentifier,
+                                "timestamp", currentTime,
+                                "audiencelist", audienceList,
+                                "readusers", me));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (FirebaseMessagingException e) {
+            e.printStackTrace();
+        }
+        return Map.of("chatid", photoIdentifier, "writer", me, "timestamp", currentTime,
+                "readusers", me);
+    }
+
+    @GetMapping("/get-chatphoto/{imageid}")
+    public byte[] getChatPhoto(@PathVariable("imageid") String imageid){
+        final String path = "/Users/nicode./Capstone2AwsRest/src/main/resources/chatPhotos/" + imageid + ".jpeg";
+        System.out.println(path);
+        File file = new File(path);
+		byte[] byteImage = null;
+
+        BufferedImage originalImage = null;
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		try {
+			originalImage = ImageIO.read(file);
+			ImageIO.write(originalImage, "jpg", baos);
+			baos.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (baos != null) {
+					baos.close();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+        System.out.println(byteImage);
+		byteImage = baos.toByteArray();
+        return byteImage;
     }
 
     @PostMapping("/readmsg")

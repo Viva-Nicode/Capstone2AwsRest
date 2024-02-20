@@ -11,11 +11,13 @@ import com.azurelight.capstone_2.Repository.ChatMessageRepository;
 import com.azurelight.capstone_2.Repository.ChatroomRepository;
 import com.azurelight.capstone_2.Repository.ChatroomuserRepository;
 import com.azurelight.capstone_2.Repository.FriendRepository;
+import com.azurelight.capstone_2.Repository.ImageMessageRepository;
 import com.azurelight.capstone_2.Repository.SystemMessageRepository;
 import com.azurelight.capstone_2.Repository.UserRepository;
 import com.azurelight.capstone_2.db.ChatMessage;
 import com.azurelight.capstone_2.db.Chatroomuser;
 import com.azurelight.capstone_2.db.Friend;
+import com.azurelight.capstone_2.db.ImageMessage;
 import com.azurelight.capstone_2.db.SystemMessage;
 
 import lombok.AllArgsConstructor;
@@ -55,6 +57,9 @@ public class UserDataInitializer {
     @Autowired
     private ChatroomRepository chatroomRepository;
 
+    @Autowired
+    private ImageMessageRepository imageMessageRepository;
+
     public List<HashMap<String, String>> userFriendsFetcher(final String targetUserEmail) {
         List<HashMap<String, String>> fetchResult = new ArrayList<HashMap<String, String>>();
         List<Friend> friendslist = friendRepository.findByUserEmail(targetUserEmail);
@@ -92,7 +97,6 @@ public class UserDataInitializer {
         for (Chatroomuser chatroomuser : chatroomuserlist) {
             HashMap<String, Object> messageInfoMap = new HashMap<>();
             messageInfoMap.put("chatroomid", chatroomuser.getRoomid());
-            // 원래 가장 최근 메시지 내용인 text와 시간인 timestamp가 있었는데 이건 걍 클라쪽에서 정한다.
 
             List<SystemMessage> usersystemMessageOnlyEnter = systemMessageRepository
                     .findByIdentifierOnlyEnter(chatroomuser.getIdentifier());
@@ -103,15 +107,18 @@ public class UserDataInitializer {
             // userlistInRoom :
             // 채팅방 내 모든 유저들(state고려x)의 identifier를 반복하며 메시지들을 가져와 allUserMessageList에 add한다.
             List<ChatMessage> allUserMessageList = new ArrayList<>();
+            List<ImageMessage> allUserPhotoMessageList = new ArrayList<>();
             List<Chatroomuser> userlistInRoom = chatroomuserRepository.findByRoomid(chatroomuser.getRoomid());
 
             for (Chatroomuser cru : userlistInRoom) {
                 allUserMessageList.addAll(chatMessageRepository.findByIdentifier(cru.getIdentifier()));
+                allUserPhotoMessageList.addAll(imageMessageRepository.findByIdentifier(cru.getIdentifier()));
                 identifierToEmailConvertingTable.put(cru.getIdentifier(), cru.getEmail());
             }
 
             messageInfoMap.put("audiencelist",
-                    String.join(" ", userlistInRoom.stream().filter(u -> u.isState()).map(Chatroomuser::getEmail).toList()));
+                    String.join(" ",
+                            userlistInRoom.stream().filter(u -> u.isState()).map(Chatroomuser::getEmail).toList()));
 
             List<SystemMessage> allSystemMessageInroom = systemMessageRepository.findByRoomid(chatroomuser.getRoomid());
 
@@ -124,6 +131,8 @@ public class UserDataInitializer {
             if (mostRecentEnterSystemLog != null) {
                 List<ChatMessage> temp = new ArrayList<>();
                 List<SystemMessage> temp2 = new ArrayList<>();
+                List<ImageMessage> temp3 = new ArrayList<>();
+
                 // 가장 최근의 ENTER보다 이후에 발생한 메시지는 temp에 추가한다.
                 for (int idx = 0; idx < allUserMessageList.size(); idx++) {
                     if (allUserMessageList.get(idx).getTimestamp().compareTo(mostRecentEnterSystemLog) == 1)
@@ -136,13 +145,19 @@ public class UserDataInitializer {
                         temp2.add(allSystemMessageInroom.get(idx));
                 }
                 allSystemMessageInroom = temp2;
+
+                for (int idx = 0; idx < allUserPhotoMessageList.size(); idx++) {
+                    if (allUserPhotoMessageList.get(idx).getTimestamp().compareTo(mostRecentEnterSystemLog) == 1)
+                        temp3.add(allUserPhotoMessageList.get(idx));
+                }
+                allUserPhotoMessageList = temp3;
             }
 
             messageInfoMap.put("logs", new ArrayList<HashMap<String, Object>>());
             messageInfoMap.put("syslogs", new ArrayList<HashMap<String, Object>>());
+            messageInfoMap.put("photologs", new ArrayList<HashMap<String, Object>>());
 
             for (ChatMessage cm : allUserMessageList) {
-
                 ((ArrayList<HashMap<String, Object>>) messageInfoMap.get("logs"))
                         .add(new HashMap<String, Object>(Map.of(
                                 "chatid", cm.getChatid(),
@@ -159,6 +174,16 @@ public class UserDataInitializer {
                                 "type", sm.getType(),
                                 "timestamp", sm.getTimestamAsString(),
                                 "detail", sm.getDetail())));
+            }
+
+            for (ImageMessage im : allUserPhotoMessageList) {
+                ((ArrayList<HashMap<String, Object>>) messageInfoMap.get("photologs"))
+                        .add(new HashMap<String, Object>(Map.of(
+                                "chatid", im.getImageid(),
+                                "writer", identifierToEmailConvertingTable.get(im.getIdentifier()),
+                                "timestamp", im.getRecentTimestamAsString(),
+                                "readusers", im.getReadusers()
+                        )));
             }
             fetchResult.add(messageInfoMap);
         }
