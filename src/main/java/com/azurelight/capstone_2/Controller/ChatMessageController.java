@@ -92,6 +92,7 @@ public class ChatMessageController {
             try {
                 fs.sendNotificationAll(notificationRequestList,
                         Map.of("notitype", "receive",
+                                "messageType", "text",
                                 "roomid", chatroomid,
                                 "chatid", chatid,
                                 "detail", detail,
@@ -104,7 +105,12 @@ public class ChatMessageController {
         }
 
         chatroomRepository.updateRecentInfo(chatroomid, detail);
-        return Map.of("chatid", chatid, "writer", me, "detail", detail, "timestamp", currentTime, "readusers", me);
+        return Map.of("messageType", "text",
+                "chatid", chatid,
+                "writer", me,
+                "detail", detail,
+                "timestamp", currentTime,
+                "readusers", me);
     }
 
     @PostMapping("/send-photo")
@@ -143,9 +149,11 @@ public class ChatMessageController {
 
             if (!notificationRequestList.isEmpty()) {
                 fs.sendNotificationAll(notificationRequestList,
-                        Map.of("notitype", "photoReceive",
+                        Map.of("notitype", "receive",
+                                "messageType", "photo",
                                 "roomid", chatroomid,
                                 "chatid", photoIdentifier,
+                                "detail", "photo",
                                 "timestamp", currentTime,
                                 "audiencelist", audienceList,
                                 "readusers", me));
@@ -155,54 +163,71 @@ public class ChatMessageController {
         } catch (FirebaseMessagingException e) {
             e.printStackTrace();
         }
-        return Map.of("chatid", photoIdentifier, "writer", me, "timestamp", currentTime,
-                "readusers", me);
+        return Map.of("messageType", "photo",
+                "chatid", photoIdentifier,
+                "writer", me,
+                "timestamp", currentTime,
+                "readusers", me,
+                "detail", "photo");
     }
 
     @GetMapping("/get-chatphoto/{imageid}")
-    public byte[] getChatPhoto(@PathVariable("imageid") String imageid){
+    public byte[] getChatPhoto(@PathVariable("imageid") String imageid) {
         final String path = "/Users/nicode./Capstone2AwsRest/src/main/resources/chatPhotos/" + imageid + ".jpeg";
         System.out.println(path);
         File file = new File(path);
-		byte[] byteImage = null;
+        byte[] byteImage = null;
 
         BufferedImage originalImage = null;
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		try {
-			originalImage = ImageIO.read(file);
-			ImageIO.write(originalImage, "jpg", baos);
-			baos.flush();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (baos != null) {
-					baos.close();
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            originalImage = ImageIO.read(file);
+            ImageIO.write(originalImage, "jpg", baos);
+            baos.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (baos != null) {
+                    baos.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         System.out.println(byteImage);
-		byteImage = baos.toByteArray();
+        byteImage = baos.toByteArray();
         return byteImage;
     }
 
     @PostMapping("/readmsg")
     public int readMessage(@RequestParam(value = "chatroomid") String roomid, @RequestParam(value = "me") String me,
-            @RequestParam(value = "chatidlist") String chatid) {
+            @RequestParam(value = "chatidlist") String chatid, @RequestParam(value = "typelist") String types) {
         System.out.println(me + "가 읽음");
 
         List<String> chatidlist = Arrays.asList(chatid.split(" "));
+        List<String> typelist = Arrays.asList(types.split(" "));
         List<String> updatedChatid = new ArrayList<>();
 
-        for (String id : chatidlist) {
-            ChatMessage cm = chatMessageRepository.findById(id).get();
-            List<String> readuserlist = new ArrayList<>(Arrays.asList(cm.getReadusers().split(" ")));
-            if (!readuserlist.contains(me)) {
-                readuserlist.add(me);
-                chatMessageRepository.updateReadusersByChatid(id, String.join(" ", readuserlist));
-                updatedChatid.add(id);
+        for (int idx = 0; idx < chatidlist.size(); idx++) {
+            if (typelist.get(idx).equals("text")) {
+                ChatMessage cm = chatMessageRepository.findById(chatidlist.get(idx)).get();
+                List<String> readuserlist = new ArrayList<>(Arrays.asList(cm.getReadusers().split(" ")));
+
+                if (!readuserlist.contains(me)) {
+                    readuserlist.add(me);
+                    chatMessageRepository.updateReadusersByChatid(chatidlist.get(idx), String.join(" ", readuserlist));
+                    updatedChatid.add(chatidlist.get(idx));
+                }
+            } else if (typelist.get(idx).equals("photo")) {
+                ImageMessage im = imageMessageRepository.findById(chatidlist.get(idx)).get();
+                List<String> readuserlist = new ArrayList<>(Arrays.asList(im.getReadusers().split(" ")));
+
+                if (!readuserlist.contains(me)) {
+                    readuserlist.add(me);
+                    imageMessageRepository.updateReadusersByChatid(chatidlist.get(idx), String.join(" ", readuserlist));
+                    updatedChatid.add(chatidlist.get(idx));
+                }
             }
         }
 

@@ -155,11 +155,11 @@ public class UserDataInitializer {
 
             messageInfoMap.put("logs", new ArrayList<HashMap<String, Object>>());
             messageInfoMap.put("syslogs", new ArrayList<HashMap<String, Object>>());
-            messageInfoMap.put("photologs", new ArrayList<HashMap<String, Object>>());
 
             for (ChatMessage cm : allUserMessageList) {
                 ((ArrayList<HashMap<String, Object>>) messageInfoMap.get("logs"))
                         .add(new HashMap<String, Object>(Map.of(
+                                "messageType", "text",
                                 "chatid", cm.getChatid(),
                                 "writer", identifierToEmailConvertingTable.get(cm.getIdentifier()),
                                 "detail", cm.getDetail(),
@@ -177,13 +177,14 @@ public class UserDataInitializer {
             }
 
             for (ImageMessage im : allUserPhotoMessageList) {
-                ((ArrayList<HashMap<String, Object>>) messageInfoMap.get("photologs"))
+                ((ArrayList<HashMap<String, Object>>) messageInfoMap.get("logs"))
                         .add(new HashMap<String, Object>(Map.of(
+                                "messageType", "photo",
                                 "chatid", im.getImageid(),
                                 "writer", identifierToEmailConvertingTable.get(im.getIdentifier()),
+                                "detail", "photo",
                                 "timestamp", im.getRecentTimestamAsString(),
-                                "readusers", im.getReadusers()
-                        )));
+                                "readusers", im.getReadusers())));
             }
             fetchResult.add(messageInfoMap);
         }

@@ -15,4 +15,9 @@ public interface ImageMessageRepository extends JpaRepository<ImageMessage, Stri
     
     @Query(value = "select * from imagemessage im where im.identifier = :identifier", nativeQuery = true)
     List<ImageMessage> findByIdentifier(@Param("identifier") String identifier);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update imagemessage im set im.readusers = :readusers where im.imageid = :chatid", nativeQuery = true)
+    int updateReadusersByChatid(@Param("chatid") String chatid, @Param("readusers") String readusers);
 }
