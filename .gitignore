@@ -23,3 +23,4 @@ out/
 src/main/resources/garbage_classifier/
 src/main/resources/application.properties
 src/main/resources/garbagecollector-1055b-firebase-adminsdk-o8vcg-6c7c381787.json
+src/main/resources/chatPhotos/
