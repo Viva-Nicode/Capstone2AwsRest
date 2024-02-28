@@ -18,6 +18,7 @@ import com.azurelight.capstone_2.db.ChatMessage;
 import com.azurelight.capstone_2.db.Chatroomuser;
 import com.azurelight.capstone_2.db.Friend;
 import com.azurelight.capstone_2.db.ImageMessage;
+import java.util.Optional;
 import com.azurelight.capstone_2.db.SystemMessage;
 
 import lombok.AllArgsConstructor;
@@ -60,15 +61,15 @@ public class UserDataInitializer {
     @Autowired
     private ImageMessageRepository imageMessageRepository;
 
-    public List<HashMap<String, String>> userFriendsFetcher(final String targetUserEmail) {
-        List<HashMap<String, String>> fetchResult = new ArrayList<HashMap<String, String>>();
+    public List<HashMap<String, Object>> userFriendsFetcher(final String targetUserEmail) {
+        List<HashMap<String, Object>> fetchResult = new ArrayList<HashMap<String, Object>>();
         List<Friend> friendslist = friendRepository.findByUserEmail(targetUserEmail);
 
         for (Friend f : friendslist) {
             if (!friendRepository.findByTwoUser(f.getFriendemail(), targetUserEmail).isEmpty()) {
-                fetchResult.add(new HashMap<String, String>(
+                fetchResult.add(new HashMap<String, Object>(
                         Map.of("friendEmail", f.getFriendemail(),
-                                "group", f.getFriendgroup())));
+                                "group", Optional.ofNullable(f.getFriendgroup()))));
             }
         }
         return fetchResult;

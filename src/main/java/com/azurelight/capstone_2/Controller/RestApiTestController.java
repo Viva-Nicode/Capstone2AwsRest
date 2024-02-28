@@ -159,7 +159,7 @@ public class RestApiTestController {
 	public byte[] getRequestProfile(@PathVariable("email") String email) {
 
 		final User u = ur.findById(email).get();
-		final String path = "/Users/nicode./Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
+		final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/profiles/" + u.getProfile_image();
 
 		if (u.getProfile_image() == null)
 			return null;
@@ -225,7 +225,7 @@ public class RestApiTestController {
 			@RequestParam(value = "audience") String audience) {
 
 		String fcmtoken = userRepository.findById(audience).get().getFcmtoken();
-		friendRepository.save(new Friend(UUID.randomUUID() + "", me, audience, "$none$"));
+		friendRepository.save(new Friend(UUID.randomUUID() + "", me, audience, null));
 
 		try {
 			fs.sendNotification(new NotificationRequest(fcmtoken, "친추 수락함", me + " <- 얘가"),
@@ -248,7 +248,7 @@ public class RestApiTestController {
 	public Map<String, Object> doRequestAddFriend(@RequestParam(value = "me") String me,
 			@RequestParam(value = "audience") String audience) {
 		String fcmtoken = userRepository.findById(audience).get().getFcmtoken();
-		friendRepository.save(new Friend(UUID.randomUUID() + "", me, audience, "$none$"));
+		friendRepository.save(new Friend(UUID.randomUUID() + "", me, audience, null));
 
 		try {
 			fs.sendNotification(new NotificationRequest(fcmtoken, "친추옴", me + " <- 얘한테"),

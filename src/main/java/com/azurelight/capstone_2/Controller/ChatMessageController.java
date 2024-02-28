@@ -121,7 +121,7 @@ public class ChatMessageController {
         final String photoname = photoIdentifier + "." + ext;
         String currentTime = "";
         final String userIdentifier = chatroomuserRepository.findIdentifierByRoomidAndEmail(chatroomid, me).get(0);
-        File dest = new File("/Users/nicode./Capstone2AwsRest/src/main/resources/chatPhotos/" + photoname);
+        File dest = new File("/home/ubuntu/Capstone2AwsRest/src/main/resources/chatPhotos/" + photoname);
 
         try {
             BufferedInputStream bis = new BufferedInputStream(photo.getInputStream());
@@ -173,8 +173,7 @@ public class ChatMessageController {
 
     @GetMapping("/get-chatphoto/{imageid}")
     public byte[] getChatPhoto(@PathVariable("imageid") String imageid) {
-        final String path = "/Users/nicode./Capstone2AwsRest/src/main/resources/chatPhotos/" + imageid + ".jpeg";
-        System.out.println(path);
+        final String path = "/home/ubuntu/Capstone2AwsRest/src/main/resources/chatPhotos/" + imageid + ".jpeg";
         File file = new File(path);
         byte[] byteImage = null;
 
@@ -195,7 +194,6 @@ public class ChatMessageController {
                 e.printStackTrace();
             }
         }
-        System.out.println(byteImage);
         byteImage = baos.toByteArray();
         return byteImage;
     }
